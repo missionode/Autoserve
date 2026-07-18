@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="en"><head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Autoserve | The Future of Fast Casual</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @theme {
+        --color-surface-dim: #d8d9e6;
+        --color-on-primary-container: #ebedff;
+        --color-on-background: #191b24;
+        --color-on-primary-fixed-variant: #003ea8;
+        --color-surface-container-highest: #e1e2ee;
+        --color-error: #ff1744;
+        --color-primary-fixed-dim: #b4c5ff;
+        --color-background: #faf8ff;
+        --color-surface-bright: #faf8ff;
+        --color-primary: #0049c4;
+        --color-on-primary: #ffffff;
+        --color-tertiary: #004fb0;
+        --color-on-error-container: #93000a;
+        --color-tertiary-container: #0066e0;
+        --color-on-secondary-fixed: #041942;
+        --color-on-surface-variant: #424655;
+        --color-primary-container: #015ff8;
+        --color-on-secondary-fixed-variant: #344670;
+        --color-brand-medium: #025eec;
+        --color-surface-container: #ecedfa;
+        --color-on-tertiary-fixed: #001a43;
+        --color-surface-container-low: #f2f3ff;
+        --color-outline: #737687;
+        --color-success: #00c853;
+        --color-secondary-fixed-dim: #b4c5f8;
+        --color-tertiary-fixed: #d8e2ff;
+        --color-on-secondary: #ffffff;
+        --color-on-secondary-container: #445581;
+        --color-on-tertiary-container: #e9edff;
+        --color-inverse-primary: #b4c5ff;
+        --color-on-surface: #191b24;
+        --color-text-muted: #626776;
+        --color-tertiary-fixed-dim: #afc6ff;
+        --color-warning: #ffab00;
+        --color-inverse-surface: #2e3039;
+        --color-secondary: #4c5d89;
+        --color-inverse-on-surface: #eff0fd;
+        --color-secondary-fixed: #dae2ff;
+        --color-surface-variant: #e1e2ee;
+        --color-on-error: #ffffff;
+        --color-on-tertiary-fixed-variant: #004397;
+        --color-surface-faint: #f8faff;
+        --color-surface-container-high: #e7e7f4;
+        --color-on-tertiary: #ffffff;
+        --color-primary-fixed: #dbe1ff;
+        --color-surface-container-lowest: #ffffff;
+        --color-on-primary-fixed: #00174b;
+        --color-surface-tint: #0053db;
+        --color-secondary-container: #bacbfe;
+        --color-surface: #faf8ff;
+        --color-outline-variant: #c2c6d8;
+        --color-error-container: #ffdad6;
+
+        --spacing-margin-mobile: 16px;
+        --spacing-md: 24px;
+        --spacing-margin-desktop: 64px;
+        --spacing-xl: 80px;
+        --spacing-sm: 12px;
+        --spacing-base: 8px;
+        --spacing-xs: 4px;
+        --spacing-gutter: 24px;
+        --spacing-lg: 48px;
+
+        --font-display-lg: "Hanken Grotesk", sans-serif;
+        --font-label-md: "Hanken Grotesk", sans-serif;
+        --font-body-md: "Hanken Grotesk", sans-serif;
+        --font-body-lg: "Hanken Grotesk", sans-serif;
+        --font-headline-md: "Hanken Grotesk", sans-serif;
+        --font-label-lg: "Hanken Grotesk", sans-serif;
+        --font-headline-lg: "Hanken Grotesk", sans-serif;
+        --font-display-lg-mobile: "Hanken Grotesk", sans-serif;
+        --font-headline-lg-mobile: "Hanken Grotesk", sans-serif;
+
+        --text-display-lg: 56px;
+        --text-display-lg--line-height: 1.1;
+        --text-display-lg--letter-spacing: -0.02em;
+        --text-display-lg--font-weight: 800;
+        --text-label-md: 12px;
+        --text-label-md--line-height: 1.2;
+        --text-label-md--font-weight: 600;
+        --text-body-md: 16px;
+        --text-body-md--line-height: 1.5;
+        --text-body-md--font-weight: 400;
+        --text-body-lg: 18px;
+        --text-body-lg--line-height: 1.5;
+        --text-body-lg--font-weight: 400;
+        --text-headline-md: 24px;
+        --text-headline-md--line-height: 1.3;
+        --text-headline-md--font-weight: 700;
+        --text-label-lg: 14px;
+        --text-label-lg--line-height: 1.2;
+        --text-label-lg--letter-spacing: 0.1em;
+        --text-label-lg--font-weight: 700;
+        --text-headline-lg: 32px;
+        --text-headline-lg--line-height: 1.2;
+        --text-headline-lg--font-weight: 700;
+        --text-display-lg-mobile: 40px;
+        --text-display-lg-mobile--line-height: 1.1;
+        --text-display-lg-mobile--letter-spacing: -0.01em;
+        --text-display-lg-mobile--font-weight: 800;
+        --text-headline-lg-mobile: 28px;
+        --text-headline-lg-mobile--line-height: 1.2;
+        --text-headline-lg-mobile--font-weight: 700;
+      }
+    </style>
+<style>
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+    .bento-hover {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .bento-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px -10px rgba(0, 73, 196, 0.15);
+    }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-primary-fixed-dim selection:text-on-primary-fixed">
+<!-- TopNavBar -->
+<nav class="bg-surface/80 backdrop-blur-md sticky top-0 z-50 flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-4">
+    <div class="flex items-center gap-2">
+        <img alt="Autoserve Logo" class="h-8 w-auto md:h-10" src="./Autoserve%20logo.svg"/>
+    </div>
+    <div class="hidden md:flex items-center gap-xl">
+        <a class="text-on-surface font-label-lg hover:text-primary transition-colors" href="#features">Features</a>
+        <a class="text-on-surface font-label-lg hover:text-primary transition-colors" href="#how-it-works">How It Works</a>
+        <a class="text-on-surface font-label-lg hover:text-primary transition-colors" href="#pricing">Pricing</a>
+    </div>
+    <button class="bg-primary-container text-on-primary px-6 py-3 rounded-full font-label-lg scale-95 active:scale-90 transition-transform duration-200">
+        Order Now
+    </button>
+</nav>
+<main>
+<!-- Hero Section -->
+<section class="relative overflow-hidden px-margin-mobile md:px-margin-desktop py-lg md:py-xl flex flex-col md:flex-row items-center gap-lg min-h-[870px]">
+<!-- Decorative Accent -->
+<div class="absolute -top-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+<div class="flex-1 space-y-md text-center md:text-left z-10">
+    <span class="inline-block px-4 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-lg uppercase tracking-wider mb-xs">
+        Next-Gen Hospitality
+    </span>
+    <h1 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-on-background">
+        The Future of <span class="text-primary">Fast Casual</span>
+    </h1>
+    <p class="font-headline-md text-headline-md text-on-surface w-full">
+        Contactless Ordering, Instant Payments, and Smart Token Queues.
+    </p>
+    <p class="font-body-lg text-body-lg text-on-surface-variant w-full">
+        Empower your restaurant with the ultimate self-service experience that increases throughput and delights diners.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-base justify-center md:justify-start pt-base">
+        <button class="min-h-[56px] px-8 bg-primary text-on-primary rounded-xl font-label-lg flex items-center justify-center gap-2 hover:bg-brand-medium transition-all group">
+            Get Started
+            <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+        </button>
+        <button class="min-h-[56px] px-8 border-2 border-outline-variant text-primary rounded-xl font-label-lg flex items-center justify-center gap-2 hover:bg-surface-container transition-all">
+            View Demo
+            <span class="material-symbols-outlined">play_circle</span>
+        </button>
+    </div>
+</div>
+<div class="flex-1 relative w-full mt-lg md:mt-0">
+    <div class="relative rounded-[2rem] overflow-hidden shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-700">
+        <img class="w-full aspect-[4/5] object-cover rounded-[2rem]" data-alt="A cinematic, high-resolution lifestyle photograph of a sleek, modern self-service kiosk in a vibrant, sun-drenched fast-casual restaurant. The interior features light oak wood, navy blue accents, and lush green plants. A trendy young professional is using the large touchscreen interface, which displays high-quality images of gourmet burgers. The lighting is soft and warm, highlighting the polished metal finish of the kiosk and the bright, clean atmosphere of the hospitality space." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDi3DN_IAEN_-mCq1pHYqeRrD0HondxvOsoebQ2lfR9nMBMXSUB8ou6S1lZcHTmGEzZ-LuyxlxnMmAb31HcNJh9b2cLoowqyMk9qB7tnFNhc2C4ORzLK8Ds2FjdNKC_kDk4FxW16IW-qPcAuJilCd_OYD7REnjY2WZMUPhaG528NToqmiNGlcZ4c4HOELh8vUe28CDxpL4PSpeC3gET_e4wIaeC9eL3RB6zhf5y0FYwur9EjWrrI8TjuouJrGHOGOebDaJJD0Ak_V8"/>
+<!-- Floating UI Card overlay -->
+<div class="absolute bottom-8 -left-8 glass-card p-6 rounded-xl shadow-lg border border-white/40 hidden lg:block animate-bounce-slow">
+    <div class="flex items-center gap-sm">
+        <div class="w-12 h-12 bg-success/20 text-success rounded-full flex items-center justify-center">
+            <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+        </div>
+        <div>
+            <p class="font-label-lg text-on-surface">Payment Verified</p>
+            <p class="text-label-md text-on-surface-variant">Order #4298 Ready soon</p>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Features Section -->
+<section class="bg-surface-container-low px-margin-mobile md:px-margin-desktop py-xl" id="features">
+    <div class="text-center mb-lg space-y-xs">
+        <h2 class="font-headline-lg text-headline-lg text-on-background">Engineered for Velocity</h2>
+        <p class="text-on-surface-variant max-w-2xl mx-auto">Our platform eliminates friction at every touchpoint of the guest journey.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Feature 1 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl bento-hover border border-outline-variant/30 group">
+    <div class="w-14 h-14 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+        <span class="material-symbols-outlined text-3xl">qr_code_scanner</span>
+    </div>
+    <h3 class="font-headline-md text-headline-md text-on-surface mb-base">Contactless Ordering</h3>
+    <p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+        Customers scan, browse, and order from their own devices. No apps to download, just instant access to your full menu.
+    </p>
+</div>
+<!-- Feature 2 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl bento-hover border border-outline-variant/30 group">
+    <div class="w-14 h-14 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+        <span class="material-symbols-outlined text-3xl">contactless</span>
+    </div>
+    <h3 class="font-headline-md text-headline-md text-on-surface mb-base">Seamless Payments</h3>
+    <p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+        Integrated Apple Pay, Google Pay, and major credit card processing for a 1-tap checkout experience that guests love.
+    </p>
+</div>
+<!-- Feature 3 -->
+<div class="bg-surface-container-lowest p-8 rounded-2xl bento-hover border border-outline-variant/30 group">
+    <div class="w-14 h-14 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
+        <span class="material-symbols-outlined text-3xl">notifications_active</span>
+    </div>
+    <h3 class="font-headline-md text-headline-md text-on-surface mb-base">Smart Token Queue</h3>
+    <p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+        Real-time order tracking and automated token notifications keep diners informed and staff focused on food prep.
+    </p>
+</div>
+</div>
+</section>
+<!-- How It Works Section -->
+<section class="px-margin-mobile md:px-margin-desktop py-xl" id="how-it-works">
+    <div class="flex flex-col md:flex-row gap-lg items-center">
+        <div class="flex-1 space-y-md">
+            <h2 class="font-headline-lg text-headline-lg-mobile text-on-background md:text-headline-lg">Simple for Guests.<br/>Powerful for Owners.</h2>
+            <div class="space-y-lg relative">
+<!-- Connecting Line -->
+<div class="absolute left-[27px] top-4 bottom-4 w-0.5 bg-outline-variant/30 hidden md:block"></div>
+<!-- Step 1 -->
+<div class="flex items-start gap-md relative">
+    <div class="w-14 h-14 rounded-full bg-primary text-on-primary flex-shrink-0 flex items-center justify-center font-bold text-xl z-10">1</div>
+    <div>
+        <h4 class="font-headline-md text-on-surface">Scan QR</h4>
+        <p class="text-on-surface-variant">Guests find a table or stand by the kiosk and scan the unique code.</p>
+    </div>
+</div>
+<!-- Step 2 -->
+<div class="flex items-start gap-md relative">
+    <div class="w-14 h-14 rounded-full bg-primary text-on-primary flex-shrink-0 flex items-center justify-center font-bold text-xl z-10">2</div>
+    <div>
+        <h4 class="font-headline-md text-on-surface">Place Order</h4>
+        <p class="text-on-surface-variant">A beautiful, intuitive digital menu lets guests customize and pay instantly.</p>
+    </div>
+</div>
+<!-- Step 3 -->
+<div class="flex items-start gap-md relative">
+    <div class="w-14 h-14 rounded-full bg-primary text-on-primary flex-shrink-0 flex items-center justify-center font-bold text-xl z-10">3</div>
+    <div>
+        <h4 class="font-headline-md text-on-surface">Pick up</h4>
+        <p class="text-on-surface-variant">Automatic tokens alert the guest when their fresh meal is ready at the counter.</p>
+    </div>
+</div>
+</div>
+</div>
+<div class="flex-1 w-full">
+    <div class="grid grid-cols-2 gap-md">
+        <div class="space-y-md pt-lg">
+            <img class="w-full h-64 object-cover rounded-2xl shadow-md" data-alt="A close-up shot of a smartphone screen showing a vibrant restaurant menu interface with high-resolution food photography of fresh salads and grain bowls. The phone is held by a hand in a modern, brightly lit cafe setting. The background is softly blurred, focusing on the seamless digital ordering experience. The UI is clean, using a primary blue and crisp white palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHXw0C0EvcDnfkELRSSCzs0R80pvuu_WGydKbcLurU8sxUSCVgG-p00fRYKqUnOFi1pPx9bVMtfRt3e3wZTxhrXpzAkS4JAEVfp22LYn-BKC91vRGDlpcHj_iPgs-P_7pYRjHydUw9q5AlCMlxZgPCNabsbasM6hUUqgKTYJMnur_6D-XPh-vZ9Tzk78VBcTOMTGZK6H4w-jSIWwAhGjTqHDhfW_C2KhDYQ0Qz8zCfNkveQIG5wixB9oImaLrm1bJtaWNBDMJm4fU"/>
+            <div class="bg-primary-container p-6 rounded-2xl text-on-primary">
+                <span class="material-symbols-outlined text-4xl mb-xs">bolt</span>
+                <p class="font-label-lg">35% Faster Service</p>
+                <p class="text-sm text-on-primary/80">Average increase in order processing speed.</p>
+            </div>
+        </div>
+        <div class="space-y-md">
+            <div class="bg-secondary-container p-6 rounded-2xl text-on-secondary-container">
+                <span class="material-symbols-outlined text-4xl mb-xs">trending_up</span>
+                <p class="font-label-lg">+22% Upsell</p>
+                <p class="text-sm text-on-secondary-container/80">Higher average check size through smart modifiers.</p>
+            </div>
+            <img class="w-full h-80 object-cover rounded-2xl shadow-md" data-alt="An wide-angle architectural shot of a modern minimalist QSR restaurant interior during the day. The space is filled with natural light, featuring polished concrete floors, warm wooden tabletops, and a series of sleek ordering kiosks. No crowds are visible, conveying an atmosphere of organized efficiency and high-tech hospitality. The brand colors of vivid blue are subtly integrated into the decor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWvtnYC18qMDlf6yGJ2yV0JdNQFBpRGgzC2yJPJNrM4yHH56Zk0zp-LnHKd5eUQeoH4l8KnTP6YhRq54w_cYUlGjb4nWNWsqBmYFtRmYGCUa0fCaya4v9wIxzkmfYHoS6fdzMh8gWeuwT0-s3h7jDsvgJpbCZmN091_Hm5XgIlvLxrfDzPVi9tKBUpm71lSauw2e5hnFGgGvCF7EE8-xGHEn-dwQ5I_1mOztVvwgKIsIJU8Lu4mGUZP8HNil1Lqi6Cwdun1jsI5g4"/>
+        </div>
+    </div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="px-margin-mobile md:px-margin-desktop py-xl">
+    <div class="bg-inverse-surface rounded-[2.5rem] p-lg md:p-xl text-center relative overflow-hidden">
+<!-- Background Pattern -->
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(#ffffff 1px, transparent 1px); background-size: 32px 32px;"></div>
+<div class="relative z-10 max-w-3xl mx-auto space-y-md">
+    <h2 class="font-display-lg-mobile md:font-headline-lg text-inverse-on-surface">Ready to transform your service?</h2>
+    <p class="font-body-lg text-inverse-on-surface/80 mb-lg">
+        Join hundreds of innovative restaurants optimizing their operations with Autoserve. Reduce wait times and scale your hospitality today.
+    </p>
+    <div class="flex flex-col sm:flex-row justify-center gap-base">
+        <button class="min-h-[56px] px-10 bg-primary-container text-on-primary rounded-full font-label-lg hover:brightness-110 transition-all shadow-xl shadow-primary/20">
+            Partner with Us
+        </button>
+        <button class="min-h-[56px] px-10 border border-outline-variant text-inverse-on-surface rounded-full font-label-lg hover:bg-white/10 transition-all">
+            Talk to Sales
+        </button>
+    </div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest flex flex-col md:flex-row justify-between items-center w-full px-margin-mobile md:px-margin-desktop py-lg border-t border-outline-variant">
+    <div class="flex flex-col items-center md:items-start gap-xs mb-lg md:mb-0">
+        <div class="flex items-center gap-2 mb-xs">
+            <img alt="Autoserve Logo" class="h-8 w-auto opacity-80 md:h-10" src="./Autoserve%20logo.svg"/>
+        </div>
+        <p class="font-label-md text-label-md text-text-muted">© 2024 Autoserve QSR Systems. All rights reserved.</p>
+    </div>
+    <div class="flex flex-wrap justify-center gap-lg">
+        <a class="font-label-md text-label-md text-text-muted hover:underline hover:text-primary transition-colors" href="#">Privacy Policy</a>
+        <a class="font-label-md text-label-md text-text-muted hover:underline hover:text-primary transition-colors" href="#">Terms of Service</a>
+        <a class="font-label-md text-label-md text-text-muted hover:underline hover:text-primary transition-colors" href="#">Contact Support</a>
+        <a class="font-label-md text-label-md text-text-muted hover:underline hover:text-primary transition-colors" href="#">Careers</a>
+    </div>
+</footer>
+<script>
+        // Micro-interaction for the order button
+    const orderBtn = document.querySelector('nav button');
+    orderBtn.addEventListener('click', () => {
+        orderBtn.classList.add('bg-success');
+        orderBtn.textContent = 'Preparing...';
+        setTimeout(() => {
+            orderBtn.classList.remove('bg-success');
+            orderBtn.textContent = 'Order Now';
+        }, 2000);
+    });
+
+        // Simple scroll reveal for cards
+    const observerOptions = {
+        threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('opacity-100', 'translate-y-0');
+                entry.target.classList.remove('opacity-0', 'translate-y-8');
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.bento-hover').forEach(el => {
+        el.classList.add('opacity-0', 'translate-y-8', 'transition-all', 'duration-700');
+        observer.observe(el);
+    });
+</script>
+</body></html>
