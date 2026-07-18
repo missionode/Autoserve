@@ -1,50 +1,124 @@
 <!doctype html>
-<html lang="en">
+<html class="scroll-smooth" lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Autocode | Choose your experience</title>
+  <title>Autoserve | Hotel ordering, KOT tracking, and guest service</title>
+  <meta name="description" content="A local hotel and restaurant ordering prototype with QR entry, payment-first KOTs, kitchen tracking, and service-aware notifications.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/css/theme.css">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24; }
+    .landing-card { transition: transform 220ms ease, box-shadow 220ms ease; }
+    .landing-card:hover { transform: translateY(-5px); box-shadow: 0 24px 50px -30px rgba(0, 73, 196, .4); }
+    .landing-card > .material-symbols-outlined {
+      display: grid !important;
+      place-items: center;
+      line-height: 1;
+      text-align: center;
+      vertical-align: middle;
+    }
+    #experiences article > .material-symbols-outlined {
+      display: grid !important;
+      place-items: center;
+      line-height: 1;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .landing-grid { background-image: linear-gradient(rgba(0,73,196,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(0,73,196,.055) 1px, transparent 1px); background-size: 32px 32px; }
+  </style>
 </head>
-<body>
+<body class="bg-[#faf8ff] text-[#191b24] selection:bg-blue-200">
   <a class="skip-link" href="#main">Skip to content</a>
-  <div class="prototype-banner px-4 py-2 text-center text-xs font-bold">Local interactive prototype — data is stored in this browser</div>
-  <header class="app-shell flex items-center justify-between py-5">
-    <img class="brand-logo" src="./design_template/Autoserve%20logo.svg" alt="Autoserve">
-    <a href="./login.html" class="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-bold text-slate-800 hover:border-blue-600 hover:text-blue-700">Sign in</a>
+  <div class="prototype-banner px-4 py-2 text-center text-xs font-bold">Local interactive prototype — payments, KOTs, notifications, and data are simulated in this browser</div>
+
+  <header class="sticky top-0 z-50 border-b border-slate-200/80 bg-[#faf8ff]/90 backdrop-blur-xl">
+    <div class="app-shell flex min-h-20 items-center justify-between gap-5">
+      <a href="#top" aria-label="Autoserve home"><img class="brand-logo" src="./design_template/Autoserve%20logo.svg" alt="Autoserve"></a>
+      <nav class="hidden items-center gap-8 md:flex" aria-label="Landing navigation">
+        <a class="text-sm font-extrabold text-slate-700 hover:text-blue-700" href="#features">Features</a>
+        <a class="text-sm font-extrabold text-slate-700 hover:text-blue-700" href="#workflow">How it works</a>
+        <a class="text-sm font-extrabold text-slate-700 hover:text-blue-700" href="#experiences">Workspaces</a>
+      </nav>
+      <a href="./login.html" class="rounded-full bg-blue-700 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-blue-700/20 hover:bg-blue-800">Sign in</a>
+    </div>
   </header>
-  <main id="main" class="app-shell grid min-h-[calc(100vh-9rem)] items-center gap-10 py-10 lg:grid-cols-[1.1fr_0.9fr] lg:py-16">
-    <section>
-      <p class="mb-4 inline-flex rounded-full bg-blue-100 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.15em] text-blue-900">Self-service QSR prototype</p>
-      <h1 class="max-w-3xl text-4xl font-black leading-tight tracking-tight text-slate-950 sm:text-6xl">One ordering experience. Two purpose-built workspaces.</h1>
-      <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-600">Order and track as a customer, or operate the live restaurant queue as an Admin or Staff member.</p>
-      <div class="mt-8 flex flex-wrap gap-3">
-        <a href="./login.html" class="rounded-xl bg-blue-700 px-6 py-3.5 font-bold text-white shadow-lg shadow-blue-700/20 hover:bg-blue-800">Open sign in</a>
-        <a href="./signup.html" class="rounded-xl border-2 border-slate-300 px-6 py-3 font-bold text-blue-800 hover:border-blue-700">Create customer account</a>
+
+  <main id="main">
+    <section id="top" class="landing-grid relative overflow-hidden">
+      <div class="absolute -right-32 -top-32 size-[34rem] rounded-full bg-blue-600/10 blur-3xl"></div>
+      <div class="app-shell grid min-h-[760px] items-center gap-14 py-16 lg:grid-cols-[1.05fr_.95fr] lg:py-24">
+        <div class="relative z-10 text-center lg:text-left">
+          <span class="inline-flex items-center gap-2 rounded-full bg-blue-100 px-4 py-2 text-xs font-black uppercase tracking-[.16em] text-blue-900"><span class="material-symbols-outlined text-base">hotel</span> Next-generation hospitality</span>
+          <h1 class="mt-7 text-5xl font-black leading-[1.04] tracking-[-.035em] text-slate-950 sm:text-6xl xl:text-7xl">From QR scan to <span class="text-blue-700">ready KOT</span>, beautifully simple.</h1>
+          <p class="mx-auto mt-7 max-w-2xl text-xl font-bold leading-8 text-slate-700 lg:mx-0">A complete guest ordering journey for hotels and restaurants: browse, pay, generate the kitchen ticket, track preparation, and know exactly when food is ready.</p>
+          <p class="mx-auto mt-4 max-w-2xl leading-7 text-slate-600 lg:mx-0">Customers can choose self-service collection or table service, then enjoy a game while the kitchen handles a clear, chronological KOT queue.</p>
+          <div class="mt-9 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+            <a href="./login.html?role=customer" class="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-blue-700 px-7 font-extrabold text-white hover:bg-blue-800">Start an order <span class="material-symbols-outlined">arrow_forward</span></a>
+            <button data-guest-entry class="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-7 font-extrabold text-blue-800 hover:border-blue-700"><span class="material-symbols-outlined">person</span> Continue as guest</button>
+          </div>
+          <div class="mt-9 flex flex-wrap justify-center gap-x-7 gap-y-3 text-sm font-bold text-slate-600 lg:justify-start"><span class="flex items-center gap-2"><span class="material-symbols-outlined text-green-700">check_circle</span>No app download</span><span class="flex items-center gap-2"><span class="material-symbols-outlined text-green-700">check_circle</span>Table-aware QR</span><span class="flex items-center gap-2"><span class="material-symbols-outlined text-green-700">check_circle</span>Live KOT status</span></div>
+        </div>
+
+        <div class="relative mx-auto w-full max-w-xl">
+          <div class="absolute -inset-8 rounded-[3rem] bg-gradient-to-br from-blue-200/70 to-purple-200/50 blur-2xl"></div>
+          <div class="relative overflow-hidden rounded-[2rem] border border-white/80 bg-slate-950 p-5 shadow-2xl sm:p-8">
+            <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="size-3 rounded-full bg-red-400"></span><span class="size-3 rounded-full bg-amber-400"></span><span class="size-3 rounded-full bg-green-400"></span></div><span class="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-blue-200">LIVE GUEST VIEW</span></div>
+            <div class="mt-8 rounded-[1.5rem] bg-white p-6 sm:p-8">
+              <div class="flex items-start justify-between gap-5"><div><p class="text-xs font-black uppercase tracking-wider text-blue-700">Payment confirmed</p><h2 class="mt-2 text-3xl font-black text-slate-950">KOT #0042</h2><p class="mt-1 text-sm font-bold text-slate-500">Token #128 · Table 07</p></div><span class="material-symbols-outlined grid size-14 place-items-center rounded-full bg-green-100 text-3xl text-green-700">check_circle</span></div>
+              <div class="mt-8 grid grid-cols-4 gap-2 text-center text-[11px] font-extrabold text-slate-500"><div><span class="mx-auto block size-3 rounded-full bg-blue-700"></span><span class="mt-2 block text-blue-800">Paid</span></div><div><span class="mx-auto block size-3 rounded-full bg-blue-700"></span><span class="mt-2 block text-blue-800">Accepted</span></div><div><span class="mx-auto block size-3 rounded-full bg-amber-500"></span><span class="mt-2 block text-amber-800">Preparing</span></div><div><span class="mx-auto block size-3 rounded-full bg-slate-200"></span><span class="mt-2 block">Ready</span></div></div>
+              <div class="mt-8 rounded-xl bg-blue-50 p-4"><div class="flex items-center gap-3"><span class="material-symbols-outlined text-blue-700">sports_esports</span><div><p class="font-black text-slate-900">Play while you wait</p><p class="text-sm text-slate-600">Your game pauses automatically when food is ready.</p></div></div></div>
+            </div>
+            <div class="mt-5 flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 p-4 text-white"><div><p class="text-xs font-bold text-blue-200">Kitchen update</p><p class="font-black">Estimated in 12 minutes</p></div><span class="material-symbols-outlined text-3xl text-blue-300">notifications_active</span></div>
+          </div>
+        </div>
       </div>
     </section>
-    <section class="grid gap-5" aria-label="Choose an experience">
-      <article class="app-card p-7">
-        <p class="text-sm font-bold text-blue-700">Customer</p>
-        <h2 class="mt-2 text-2xl font-extrabold text-slate-950">Order, pay, track, and play</h2>
-        <p class="mt-3 leading-7 text-slate-600">Browse the menu as a guest or sign in to unlock order history and Tic-Tac-Toe rewards.</p>
-        <div class="mt-6 flex flex-wrap gap-3">
-          <a href="./login.html?role=customer" class="rounded-lg bg-blue-700 px-5 py-3 text-sm font-bold text-white">Customer sign in</a>
-          <button data-guest-entry class="rounded-lg bg-slate-100 px-5 py-3 text-sm font-bold text-slate-800 hover:bg-slate-200">Continue as guest</button>
+
+    <section id="features" class="bg-[#f2f3ff] py-20 sm:py-24">
+      <div class="app-shell">
+        <div class="mx-auto max-w-3xl text-center"><p class="text-sm font-black uppercase tracking-[.16em] text-blue-700">Engineered for smooth service</p><h2 class="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Every touchpoint, connected.</h2><p class="mt-5 text-lg leading-8 text-slate-600">The guest experience and restaurant workspace share one clear operational flow—from entry context to the final ready notification.</p></div>
+        <div class="mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <article class="landing-card rounded-2xl border border-slate-200 bg-white p-8"><span class="material-symbols-outlined grid size-14 place-items-center rounded-xl bg-blue-100 text-3xl text-blue-700">qr_code_scanner</span><h3 class="mt-6 text-2xl font-black">Scan and enter</h3><p class="mt-3 leading-7 text-slate-600">A store or table QR carries hotel and table context directly into the customer journey, including through sign-in.</p></article>
+          <article class="landing-card rounded-2xl border border-slate-200 bg-white p-8"><span class="material-symbols-outlined grid size-14 place-items-center rounded-xl bg-green-100 text-3xl text-green-700">payments</span><h3 class="mt-6 text-2xl font-black">Pay before KOT</h3><p class="mt-3 leading-7 text-slate-600">Only a successful simulated payment creates the order, token, sequential KOT, and immutable kitchen snapshot.</p></article>
+          <article class="landing-card rounded-2xl border border-slate-200 bg-white p-8"><span class="material-symbols-outlined grid size-14 place-items-center rounded-xl bg-amber-100 text-3xl text-amber-800">restaurant</span><h3 class="mt-6 text-2xl font-black">Kitchen availability</h3><p class="mt-3 leading-7 text-slate-600">Staff publish what can be prepared now using Available, Limited, Temporarily unavailable, and Sold out today.</p></article>
+          <article class="landing-card rounded-2xl border border-slate-200 bg-white p-8"><span class="material-symbols-outlined grid size-14 place-items-center rounded-xl bg-purple-100 text-3xl text-purple-700">receipt_long</span><h3 class="mt-6 text-2xl font-black">Live KOT queue</h3><p class="mt-3 leading-7 text-slate-600">Paid tickets progress chronologically through New, Accepted, Preparing, Ready, and Served with an auditable timeline.</p></article>
+          <article class="landing-card rounded-2xl border border-slate-200 bg-white p-8"><span class="material-symbols-outlined grid size-14 place-items-center rounded-xl bg-cyan-100 text-3xl text-cyan-700">notifications_active</span><h3 class="mt-6 text-2xl font-black">Service-aware alerts</h3><p class="mt-3 leading-7 text-slate-600">Self-service guests receive collection instructions; table-service guests know their meal will be brought to them.</p></article>
+          <article class="landing-card rounded-2xl border border-slate-200 bg-white p-8"><span class="material-symbols-outlined grid size-14 place-items-center rounded-xl bg-pink-100 text-3xl text-pink-700">sports_esports</span><h3 class="mt-6 text-2xl font-black">Play while waiting</h3><p class="mt-3 leading-7 text-slate-600">Tic-Tac-Toe keeps the wait engaging, supports an availability-aware reward, and pauses when the KOT is ready.</p></article>
         </div>
-      </article>
-      <article class="app-card p-7">
-        <p class="text-sm font-bold text-blue-700">Restaurant</p>
-        <h2 class="mt-2 text-2xl font-extrabold text-slate-950">Run the live storefront</h2>
-        <p class="mt-3 leading-7 text-slate-600">Admin and Staff use the same secure entry, then receive role-appropriate operational tools.</p>
-        <a href="./login.html?role=restaurant" class="mt-6 inline-flex rounded-lg border-2 border-blue-700 px-5 py-2.5 text-sm font-bold text-blue-800">Restaurant sign in</a>
-      </article>
+      </div>
     </section>
+
+    <section id="workflow" class="py-20 sm:py-28">
+      <div class="app-shell grid items-center gap-14 lg:grid-cols-[.9fr_1.1fr]">
+        <div><p class="text-sm font-black uppercase tracking-[.16em] text-blue-700">How it works</p><h2 class="mt-4 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">Simple for guests.<br>Precise for the kitchen.</h2><p class="mt-6 text-lg leading-8 text-slate-600">One connected sequence removes ambiguity for the customer and gives staff a paid, actionable ticket.</p><a href="./signup.html" class="mt-8 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-6 py-3.5 font-extrabold text-white">Create customer account <span class="material-symbols-outlined">arrow_forward</span></a></div>
+        <ol class="relative space-y-5 before:absolute before:bottom-8 before:left-7 before:top-8 before:w-px before:bg-blue-200">
+          <li class="relative flex gap-5 rounded-2xl bg-white p-5 shadow-sm"><span class="z-10 grid size-14 shrink-0 place-items-center rounded-full bg-blue-700 text-xl font-black text-white">1</span><div><h3 class="text-xl font-black">Scan the hotel QR</h3><p class="mt-2 leading-7 text-slate-600">Open the correct restaurant and optionally prefill the guest's table.</p></div></li>
+          <li class="relative flex gap-5 rounded-2xl bg-white p-5 shadow-sm"><span class="z-10 grid size-14 shrink-0 place-items-center rounded-full bg-blue-700 text-xl font-black text-white">2</span><div><h3 class="text-xl font-black">Browse, customize, and pay</h3><p class="mt-2 leading-7 text-slate-600">Choose available items and select self-service pickup or table service.</p></div></li>
+          <li class="relative flex gap-5 rounded-2xl bg-white p-5 shadow-sm"><span class="z-10 grid size-14 shrink-0 place-items-center rounded-full bg-blue-700 text-xl font-black text-white">3</span><div><h3 class="text-xl font-black">Generate the paid KOT</h3><p class="mt-2 leading-7 text-slate-600">Payment confirmation allocates the KOT, token, and kitchen-ready snapshot.</p></div></li>
+          <li class="relative flex gap-5 rounded-2xl bg-white p-5 shadow-sm"><span class="z-10 grid size-14 shrink-0 place-items-center rounded-full bg-blue-700 text-xl font-black text-white">4</span><div><h3 class="text-xl font-black">Track, play, and receive</h3><p class="mt-2 leading-7 text-slate-600">The guest waits with live progress and receives the correct ready instruction.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="experiences" class="bg-slate-950 py-20 text-white sm:py-24">
+      <div class="app-shell"><div class="max-w-3xl"><p class="text-sm font-black uppercase tracking-[.16em] text-blue-300">Two purpose-built workspaces</p><h2 class="mt-4 text-4xl font-black tracking-tight sm:text-5xl">Choose how you want to explore.</h2><p class="mt-5 text-lg leading-8 text-slate-300">Keep the customer journey delightfully simple while giving Admin and Staff the operational controls they need.</p></div>
+        <div class="mt-12 grid gap-6 lg:grid-cols-2">
+          <article class="rounded-[2rem] border border-white/10 bg-white/5 p-8 sm:p-10"><span class="material-symbols-outlined grid size-16 place-items-center rounded-2xl bg-blue-600 text-4xl">room_service</span><p class="mt-7 text-sm font-black uppercase tracking-wider text-blue-300">Customer</p><h3 class="mt-2 text-3xl font-black">Order, pay, track, and play.</h3><p class="mt-4 max-w-xl leading-7 text-slate-300">Browse as a guest or sign in for retained order history and reward eligibility. Table context stays with the order from QR to KOT.</p><div class="mt-8 flex flex-wrap gap-3"><a href="./login.html?role=customer" class="rounded-xl bg-blue-600 px-6 py-3 font-extrabold text-white hover:bg-blue-500">Customer sign in</a><button data-guest-entry class="rounded-xl border border-white/30 px-6 py-3 font-extrabold hover:bg-white/10">Continue as guest</button></div></article>
+          <article class="rounded-[2rem] border border-white/10 bg-white/5 p-8 sm:p-10"><span class="material-symbols-outlined grid size-16 place-items-center rounded-2xl bg-purple-600 text-4xl">display_settings</span><p class="mt-7 text-sm font-black uppercase tracking-wider text-purple-300">Restaurant</p><h3 class="mt-2 text-3xl font-black">Operate the live kitchen.</h3><p class="mt-4 max-w-xl leading-7 text-slate-300">Admin and Staff share one secure entry and receive role-aware access to KOTs, availability, reports, settings, QR generation, and data tools.</p><a href="./login.html?role=restaurant" class="mt-8 inline-flex rounded-xl bg-white px-6 py-3 font-extrabold text-slate-950 hover:bg-slate-100">Restaurant sign in</a></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-20 sm:py-24"><div class="app-shell overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-700 to-blue-900 px-7 py-14 text-center text-white shadow-2xl sm:px-14"><span class="material-symbols-outlined text-5xl text-blue-200">qr_code_2</span><h2 class="mx-auto mt-5 max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">Ready to experience the full hotel ordering journey?</h2><p class="mx-auto mt-5 max-w-2xl text-lg leading-8 text-blue-100">Enter as a customer, continue as a guest, or open the restaurant workspace to manage the live KOT queue.</p><div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><a href="./login.html" class="rounded-xl bg-white px-7 py-3.5 font-extrabold text-blue-900">Open sign in</a><a href="./signup.html" class="rounded-xl border border-white/40 px-7 py-3.5 font-extrabold text-white hover:bg-white/10">Create account</a></div></div></section>
   </main>
+
+  <footer class="border-t border-slate-200 bg-white py-10"><div class="app-shell flex flex-col items-center justify-between gap-6 text-center sm:flex-row sm:text-left"><div><img class="brand-logo" src="./design_template/Autoserve%20logo.svg" alt="Autoserve"><p class="mt-3 text-sm text-slate-500">Hotel ordering and KOT operations prototype.</p></div><div class="flex flex-wrap justify-center gap-6 text-sm font-bold text-slate-600"><a href="./login.html">Sign in</a><a href="./signup.html">Sign up</a><a href="./README.md">Project README</a></div></div></footer>
+
   <script src="./assets/js/state.js"></script>
   <script src="./assets/js/app.js"></script>
   <script src="./assets/js/auth.js"></script>
