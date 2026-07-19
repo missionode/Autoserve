@@ -174,7 +174,7 @@ test("checkout respects restaurant fulfillment preferences", () => {
 });
 
 test("staff delegated actions use a reloadable daily administrative token", () => {
-  assert.match(scripts["state.js"], /SCHEMA_VERSION = 7/);
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 9/);
   assert.match(scripts["state.js"], /administrativeToken: createAdministrativeToken\(\)/);
   assert.match(scripts["state.js"], /administrativeTokenExpiresAt: nextLocalMidnight\(\)/);
   assert.match(scripts["admin-settings.js"], /Daily administrative token/);
@@ -260,6 +260,20 @@ test("every mobile workspace destination receives a corresponding menu icon", ()
   assert.match(themeCss, /\.mobile-navigation a\[aria-current="page"\] \.mobile-nav-icon/);
 });
 
+test("demo state includes coherent order, payment, reward, and cancellation history", () => {
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 9/);
+  assert.match(scripts["state.js"], /function sampleHistory\(\)/);
+  for (const sample of ["order_sample_100", "order_sample_101", "order_sample_102", "payment_sample_100", "auth_sample_102", "game_sample_100"]) assert.match(scripts["state.js"], new RegExp(sample));
+  assert.match(scripts["state.js"], /status: "delivered"/);
+  assert.match(scripts["state.js"], /status: "cancelled"/);
+  assert.match(scripts["state.js"], /paymentStatus: "refunded"/);
+  assert.match(scripts["state.js"], /rewardSource: "tic_tac_toe"/);
+  assert.match(scripts["state.js"], /!state\.orders\.some\(\(order\) => \["delivered", "cancelled"\]\.includes\(order\.status\)\)/);
+  assert.match(scripts["history-reports.js"], /time: "today"/);
+  assert.match(scripts["history-reports.js"], /if \(reportRangeSelect\) reportRangeSelect\.value = "today"/);
+  assert.match(scripts["history-reports.js"], /if \(historyTimeSelect\) historyTimeSelect\.value = "today"/);
+});
+
 test("store QR entry preserves restaurant and table context through authentication", () => {
   assert.match(restaurantHtml, /data-route="qr"/);
   assert.match(scripts["qr-entry.js"], /searchParams\.set\("restaurant"/);
@@ -325,4 +339,17 @@ test("paid hotel orders generate KOTs, wait in the game, and use service-aware r
   assert.match(scripts["tracking-game.js"], /will be served/);
   assert.match(scripts["hotel-availability.js"], /Limited availability/);
   assert.match(restaurantHtml, /Live KOT queue/);
+});
+
+test("post-payment game shows an order-based countdown and simulates meal readiness", () => {
+  assert.match(scripts["checkout.js"], /const estimatedMinutes = Math\.max/);
+  assert.match(scripts["checkout.js"], /estimatedMinutes \* 5000/);
+  assert.match(scripts["checkout.js"], /simulationReadyAt/);
+  assert.match(scripts["checkout.js"], /global\.location\.hash = "\/game"/);
+  assert.match(scripts["tracking-game.js"], /function preparationCountdown/);
+  assert.match(scripts["tracking-game.js"], /Demo meal timer/);
+  assert.match(scripts["tracking-game.js"], /function simulatePreparation/);
+  assert.match(scripts["tracking-game.js"], /order_received.*preparing.*ready/s);
+  assert.match(scripts["tracking-game.js"], /demo-meal-preparation-progressed/);
+  assert.match(scripts["tracking-game.js"], /setInterval\(\(\) => \{ simulatePreparation\(\); renderTracking\(\); \}, 1000\)/);
 });

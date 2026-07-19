@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "autocode.prototype.state";
-  const SCHEMA_VERSION = 7;
+  const SCHEMA_VERSION = 9;
   const listeners = new Set();
 
   const now = () => new Date().toISOString();
@@ -10,8 +10,32 @@
   const createAdministrativeToken = () => String(Math.floor(100000 + Math.random() * 900000));
   const nextLocalMidnight = () => { const date = new Date(); date.setHours(24, 0, 0, 0); return date.toISOString(); };
 
+  function sampleHistory() {
+    const start = new Date(); start.setHours(0, 1, 0, 0);
+    const at = (minutesAgo) => new Date(Math.max(Date.now() - minutesAgo * 60000, start.getTime())).toISOString();
+    const item = (itemId, name, quantity, unitPrice, options) => ({ itemId, name, quantity, unitPrice, lineTotal: unitPrice * quantity, sizeId: "regular", sizeName: "Regular", spiceLevel: options?.spiceLevel || "", addOns: [], instructions: "", ...(options || {}) });
+    const burger = item("item_burger", "Classic Veg Burger", 1, 189, { spiceLevel: "Medium" });
+    const reward = item("item_cold_coffee", "Cold Coffee", 1, 0, { rewardSource: "tic_tac_toe", rewardIssuedAt: at(152) });
+    const fries = item("item_fries", "Seasoned Fries", 2, 99, { spiceLevel: "Peri Peri" });
+    const brownie = item("item_brownie", "Chocolate Brownie", 1, 119);
+    const paidSnapshot = (items, subtotal, tax, total, capturedAt) => ({ items: clone(items), subtotal, tax, taxPercent: 5, total, capturedAt });
+    const staffEvent = (type, label, timestamp) => ({ type, label, at: timestamp, actor: "staff_demo", actorName: "Demo Staff" });
+    const orders = [
+      { id: "order_sample_100", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", customerName: "Demo Customer", mobile: "9000000001", orderType: "dine-in", serviceMode: "table-service", tableNumber: "T03", orderNotes: "No onion in the burger", token: "100", kotNumber: "0001", kotStatus: "served", status: "delivered", paymentStatus: "success", paymentId: "payment_sample_100", transactionId: "SIM-UPI-100", items: [burger, reward], paidSnapshot: paidSnapshot([burger], 189, 9.45, 198.45, at(165)), subtotal: 189, tax: 9.45, taxPercent: 5, total: 198.45, estimatedMinutes: 12, inventoryModel: "availability", createdAt: at(165), preparingAt: at(158), readyAt: at(149), deliveredAt: at(144), updatedAt: at(144), timeline: [{ type: "order_created", label: "Paid order created", at: at(165), actor: "customer_demo", actorName: "Demo Customer" }, { type: "payment_confirmed", label: "Payment confirmed", at: at(164), actor: "system", actorName: "System" }, staffEvent("order_received", "Order accepted", at(160)), staffEvent("preparing", "Preparation started", at(158)), { type: "reward_issued", label: "Cold Coffee reward added", at: at(152), actor: "customer_demo", actorName: "Demo Customer" }, staffEvent("ready", "Order marked Ready", at(149)), staffEvent("delivered", "Table delivery confirmed", at(144))] },
+      { id: "order_sample_101", restaurantId: "rest_autoserve_demo", customerId: "guest_sample", customerName: "Walk-in Guest", mobile: "9000000012", orderType: "takeaway", serviceMode: "self-service", tableNumber: "", orderNotes: "", token: "101", kotNumber: "0002", kotStatus: "served", status: "delivered", paymentStatus: "success", paymentId: "payment_sample_101", transactionId: "SIM-UPI-101", items: [fries], paidSnapshot: paidSnapshot([fries], 198, 9.9, 207.9, at(105)), subtotal: 198, tax: 9.9, taxPercent: 5, total: 207.9, estimatedMinutes: 6, inventoryModel: "availability", createdAt: at(105), preparingAt: at(99), readyAt: at(92), deliveredAt: at(84), updatedAt: at(84), timeline: [{ type: "order_created", label: "Paid order created", at: at(105), actor: "guest", actorName: "Walk-in Guest" }, { type: "payment_confirmed", label: "Payment confirmed", at: at(104), actor: "system", actorName: "System" }, staffEvent("order_received", "Order accepted", at(101)), staffEvent("preparing", "Preparation started", at(99)), staffEvent("ready", "Pickup token marked Ready", at(92)), staffEvent("delivered", "Counter collection confirmed", at(84))] },
+      { id: "order_sample_102", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", customerName: "Demo Customer", mobile: "9000000001", orderType: "dine-in", serviceMode: "table-service", tableNumber: "T03", orderNotes: "", token: "102", kotNumber: "0003", kotStatus: "cancelled", status: "cancelled", paymentStatus: "refunded", paymentId: "payment_sample_102", transactionId: "SIM-UPI-102", items: [brownie], paidSnapshot: paidSnapshot([brownie], 119, 5.95, 124.95, at(48)), subtotal: 119, tax: 5.95, taxPercent: 5, total: 124.95, estimatedMinutes: 5, inventoryModel: "availability", createdAt: at(48), cancelledAt: at(42), updatedAt: at(42), cancelledBy: "staff_demo", cancellation: { id: "cancel_sample_102", reasonType: "item_unavailable", reason: "Brownie batch was unavailable after the order was placed", requestedBy: "staff_demo", requestedByName: "Demo Staff", authorizedBy: "admin_demo", authorizedByName: "Demo Admin", statusAtCancellation: "payment_confirmed", restoredItems: [], at: at(42) }, refund: { id: "refund_sample_102", status: "refunded", mode: "simulated", amount: 124.95, transactionId: "SIM-REF-102", createdAt: at(42) }, timeline: [{ type: "order_created", label: "Paid order created", at: at(48), actor: "customer_demo", actorName: "Demo Customer" }, { type: "payment_confirmed", label: "Payment confirmed", at: at(47), actor: "system", actorName: "System" }, staffEvent("cancellation_requested", "Cancellation requested: item unavailable", at(43)), { type: "cancellation_authorized", label: "Cancellation authorized by Demo Admin", at: at(42), actor: "admin_demo", actorName: "Demo Admin" }, { type: "refund_created", label: "Simulated refund created", at: at(42), actor: "system", actorName: "System" }] }
+    ];
+    const payments = [
+      { id: "payment_sample_100", attemptId: "attempt_sample_100", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", orderId: "order_sample_100", amount: 198.45, method: "upi-id", upiId: "demo@upi", status: "success", transactionId: "SIM-UPI-100", createdAt: at(165), updatedAt: at(164) },
+      { id: "payment_sample_101", attemptId: "attempt_sample_101", restaurantId: "rest_autoserve_demo", customerId: "guest_sample", orderId: "order_sample_101", amount: 207.9, method: "upi-qr", status: "success", transactionId: "SIM-UPI-101", createdAt: at(105), updatedAt: at(104) },
+      { id: "payment_sample_102", attemptId: "attempt_sample_102", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", orderId: "order_sample_102", amount: 124.95, method: "upi-id", upiId: "demo@upi", status: "refunded", transactionId: "SIM-UPI-102", refundId: "refund_sample_102", refundedAt: at(42), createdAt: at(48), updatedAt: at(42) }
+    ];
+    return { orders, payments, authorizationAttempts: [{ id: "auth_sample_102", restaurantId: "rest_autoserve_demo", orderId: "order_sample_102", actorId: "staff_demo", actorName: "Demo Staff", authorizerId: "admin_demo", authorizerName: "Demo Admin", action: "order_cancellation", success: true, reason: "item_unavailable", at: at(42) }], gameAttempts: [{ id: "game_sample_100", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", orderId: "order_sample_100", rewardEligible: true, result: "win", rewardStatus: "issued", rewardItemId: "item_cold_coffee", board: ["X", "O", "", "X", "O", "", "X", "", ""], createdAt: at(155), completedAt: at(152), updatedAt: at(152) }] };
+  }
+
   function seedState() {
     const createdAt = now();
+    const samples = sampleHistory();
 
     return {
       schemaVersion: SCHEMA_VERSION,
@@ -37,8 +61,8 @@
           administrativeToken: createAdministrativeToken(),
           administrativeTokenExpiresAt: nextLocalMidnight(),
           tokenStart: 100,
-          nextToken: 100,
-          nextKot: 1,
+          nextToken: 103,
+          nextKot: 4,
           lowStockDefault: 5,
           primaryRewardItemId: "item_cold_coffee",
           fallbackRewardItemId: "item_fries",
@@ -195,10 +219,11 @@
         }
       ],
       carts: [],
-      payments: [],
-      orders: [],
+      payments: samples.payments,
+      orders: samples.orders,
       inventoryAudit: [],
-      gameAttempts: [],
+      gameAttempts: samples.gameAttempts,
+      authorizationAttempts: samples.authorizationAttempts,
       backups: [],
       alerts: []
     };
@@ -270,6 +295,31 @@
         restaurant.administrativeTokenExpiresAt ||= nextLocalMidnight();
       });
       state.schemaVersion = 7;
+    }
+    if (state.schemaVersion === 7) {
+      if (!state.orders.some((order) => ["delivered", "cancelled"].includes(order.status))) {
+        const samples = sampleHistory();
+        state.orders.push(...samples.orders);
+        state.payments.push(...samples.payments);
+        state.gameAttempts.push(...samples.gameAttempts);
+        state.authorizationAttempts = [...(state.authorizationAttempts || []), ...samples.authorizationAttempts];
+        state.restaurants.forEach((restaurant) => { restaurant.nextToken = Math.max(Number(restaurant.nextToken || 100), 103); restaurant.nextKot = Math.max(Number(restaurant.nextKot || 1), 4); });
+      }
+      state.schemaVersion = 8;
+    }
+    if (state.schemaVersion === 8) {
+      if (!state.orders.some((order) => ["delivered", "cancelled"].includes(order.status))) {
+        const samples = sampleHistory();
+        const maxToken = state.orders.reduce((maximum, order) => Math.max(maximum, Number(order.token) || 0), 99);
+        const maxKot = state.orders.reduce((maximum, order) => Math.max(maximum, Number(order.kotNumber) || 0), 0);
+        samples.orders.forEach((order, index) => { order.token = String(maxToken + index + 1).padStart(3, "0"); order.kotNumber = String(maxKot + index + 1).padStart(4, "0"); });
+        state.orders.push(...samples.orders);
+        samples.payments.forEach((payment) => { if (!state.payments.some((entry) => entry.id === payment.id)) state.payments.push(payment); });
+        samples.gameAttempts.forEach((attempt) => { if (!state.gameAttempts.some((entry) => entry.id === attempt.id)) state.gameAttempts.push(attempt); });
+        state.authorizationAttempts = [...(state.authorizationAttempts || []), ...samples.authorizationAttempts.filter((attempt) => !(state.authorizationAttempts || []).some((entry) => entry.id === attempt.id))];
+        state.restaurants.forEach((restaurant) => { restaurant.nextToken = Math.max(Number(restaurant.nextToken || 100), maxToken + 4); restaurant.nextKot = Math.max(Number(restaurant.nextKot || 1), maxKot + 4); });
+      }
+      state.schemaVersion = 9;
     }
     if (state.schemaVersion < SCHEMA_VERSION) throw new Error("No migration is available for this prototype data.");
     return state;

@@ -15,9 +15,13 @@
   const RATE_LOCK_MS = 60 * 1000;
   const MAX_PIN_FAILURES = 3;
   let cancellationOrderId = null;
-  let historyFilters = { search: "", status: "all", type: "all", time: "session", from: "", to: "", payment: "all", reward: "all", actor: "all" };
+  let historyFilters = { search: "", status: "all", type: "all", time: "today", from: "", to: "", payment: "all", reward: "all", actor: "all" };
 
   if (!cancellationDialog || !cancellationForm || !receiptDialog) return;
+  const historyTimeSelect = document.querySelector("[data-history-time]");
+  const reportRangeSelect = document.querySelector("[data-report-range]");
+  if (historyTimeSelect) historyTimeSelect.value = "today";
+  if (reportRangeSelect) reportRangeSelect.value = "today";
   const delegatedTokenField = document.querySelector("[data-admin-pin-field]");
   delegatedTokenField.querySelector("span").textContent = "Daily administrative token";
   delegatedTokenField.querySelector("input").placeholder = "Enter today’s 6-digit token";
@@ -233,7 +237,7 @@
       actorSelect.innerHTML = '<option value="all">All acting staff</option>' + actors.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`).join("");
       actorSelect.value = selected;
     }
-    document.querySelector("[data-history-scope]").textContent = session.role === "admin" ? "Review retained receipts, refunds, rewards, and activity." : "Completed and cancelled orders from your current signed-in session.";
+    document.querySelector("[data-history-scope]").textContent = session.role === "admin" ? "Review retained receipts, refunds, rewards, and activity." : historyFilters.time === "today" ? "Completed and cancelled orders from today." : "Completed and cancelled orders from your current signed-in session.";
     document.querySelector("[data-history-empty]").hidden = orders.length > 0;
     document.querySelector("[data-history-list]").innerHTML = orders.map((order) => `<article class="app-card p-5"><div class="flex items-start justify-between gap-4"><div><div class="flex items-center gap-2"><h2 class="text-2xl font-black text-slate-950">#${escapeHtml(order.token)}</h2><span class="rounded-full px-2.5 py-1 text-xs font-extrabold ${order.status === "cancelled" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}">${order.status === "cancelled" ? "Cancelled" : "Delivered"}</span>${rewardIssued(order) ? '<span class="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-extrabold text-purple-800">Reward</span>' : ""}</div><p class="mt-2 text-sm font-bold text-slate-700">${escapeHtml(order.customerName || "Guest")} · ${escapeHtml(order.orderType)}</p><p class="mt-1 text-xs text-slate-500">${new Date(order.cancelledAt || order.deliveredAt || order.updatedAt).toLocaleString("en-IN")} · ${escapeHtml(order.id)}</p></div><p class="text-right font-black text-slate-900">${formatter.format(order.total)}<br><span class="text-xs font-bold ${order.paymentStatus === "refunded" ? "text-red-700" : "text-green-700"}">${escapeHtml(order.paymentStatus)}</span></p></div>${order.cancellation ? `<p class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-900"><strong>Reason:</strong> ${escapeHtml(order.cancellation.reason)}<br><strong>Authorized by:</strong> ${escapeHtml(order.cancellation.authorizedByName)}</p>` : ""}<div class="mt-4 flex flex-wrap gap-2"><button data-view-receipt="${escapeHtml(order.id)}" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">View receipt</button>${session.role === "admin" && order.status === "delivered" ? `<button data-reopen-order="${escapeHtml(order.id)}" class="rounded-lg border border-amber-300 px-4 py-2 text-sm font-bold text-amber-800">Reopen as Ready</button>` : ""}</div></article>`).join("");
   }

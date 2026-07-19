@@ -35,6 +35,45 @@
     return `${minutes} minute${minutes === 1 ? "" : "s"} elapsed`;
   }
 
+  function preparationCountdown(order) {
+    if (order.status === "ready") return { label: "Meal ready", progress: 100 };
+    if (!order.simulationReadyAt) return { label: `About ${order.estimatedMinutes || 10} min`, progress: 0 };
+    const created = new Date(order.createdAt).getTime();
+    const ready = new Date(order.simulationReadyAt).getTime();
+    const seconds = Math.ceil(Math.max(0, ready - Date.now()) / 1000);
+    const progress = Math.max(0, Math.min(100, Math.round(((Date.now() - created) / Math.max(1, ready - created)) * 100)));
+    return { label: `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`, progress };
+  }
+
+  function countdownCard(order) {
+    const countdown = preparationCountdown(order);
+    return `<section class="mt-4 rounded-xl bg-blue-50 p-4" aria-live="polite"><div class="flex items-center justify-between gap-4"><div><p class="text-xs font-extrabold uppercase tracking-wider text-blue-700">Demo meal timer</p><p class="mt-1 text-xs text-blue-900">Based on this order’s ${Number(order.estimatedMinutes || 10)}-minute preparation estimate</p></div><strong class="font-mono text-2xl text-blue-900">${escapeHtml(countdown.label)}</strong></div><div class="mt-3 h-2 overflow-hidden rounded-full bg-blue-100"><span class="block h-full rounded-full bg-blue-700 transition-[width]" style="width:${countdown.progress}%"></span></div></section>`;
+  }
+
+  function simulatePreparation() {
+    const order = activeOrder(global.AutoCodeState.read());
+    if (!order?.simulationReadyAt || ["ready", "delivered", "cancelled"].includes(order.status)) return;
+    const created = new Date(order.createdAt).getTime();
+    const ready = new Date(order.simulationReadyAt).getTime();
+    const progress = (Date.now() - created) / Math.max(1, ready - created);
+    const target = progress >= 1 ? "ready" : progress >= 0.3 ? "preparing" : progress >= 0.15 ? "order_received" : "payment_confirmed";
+    if (statusOrder.indexOf(target) <= statusOrder.indexOf(order.status)) return;
+    global.AutoCodeState.update((state) => {
+      const current = state.orders.find((entry) => entry.id === order.id);
+      if (!current || ["ready", "delivered", "cancelled"].includes(current.status)) return;
+      const timestamp = new Date().toISOString();
+      const stages = [{ status: "order_received", threshold: 0.15, label: "Order received by demo kitchen" }, { status: "preparing", threshold: 0.3, label: "Demo kitchen started preparation" }, { status: "ready", threshold: 1, label: "Meal ready in preparation simulation" }];
+      stages.filter((stage) => progress >= stage.threshold && statusOrder.indexOf(stage.status) > statusOrder.indexOf(current.status)).forEach((stage) => {
+        current.status = stage.status;
+        current.kotStatus = stage.status === "order_received" ? "accepted" : stage.status;
+        current[stage.status === "order_received" ? "receivedAt" : `${stage.status}At`] = timestamp;
+        current.timeline.push({ type: stage.status, label: stage.label, at: timestamp, actor: "simulation", actorName: "Demo kitchen" });
+      });
+      current.updatedAt = timestamp;
+      if (current.status === "ready" && !state.alerts.some((alert) => alert.orderId === current.id && alert.type === "order_ready")) state.alerts.push({ id: createId("alert"), restaurantId, orderId: current.id, type: "order_ready", severity: "info", message: `Token #${current.token} is ready`, dismissed: false, createdAt: timestamp });
+    }, "demo-meal-preparation-progressed");
+  }
+
   function statusTracker(order) {
     const currentIndex = statusOrder.indexOf(order.status);
     if (order.status === "cancelled") return `<div class="rounded-xl bg-red-50 p-4 font-bold text-red-800">This order was cancelled.</div>`;
@@ -49,7 +88,7 @@
     document.querySelector("[data-customer-orders-empty]").hidden = orders.length > 0;
     if (active) {
       const reward = active.items.find((item) => item.rewardSource === "tic_tac_toe");
-      tracker.innerHTML = `<article class="app-card overflow-hidden"><div class="flex flex-col justify-between gap-5 bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:p-8"><div><p class="text-sm font-bold text-blue-300">ACTIVE TOKEN</p><p class="mt-1 text-5xl font-black">#${escapeHtml(active.token)}</p><p class="mt-2 text-sm text-slate-300">${escapeHtml(elapsedText(active))} · Est. ${active.estimatedMinutes} min</p></div><div class="sm:text-right"><p class="text-sm font-bold text-slate-400">Current status</p><p class="mt-1 text-2xl font-black text-white">${escapeHtml(statusLabels[active.status])}</p><p class="mt-2 text-sm text-slate-300">${active.orderType === "dine-in" ? `Table ${escapeHtml(active.tableNumber)}` : "Takeaway"}</p></div></div><div class="p-6 sm:p-8">${statusTracker(active)}${reward ? `<div class="mt-5 rounded-xl bg-purple-50 p-4 text-sm font-bold text-purple-900">🎁 ${escapeHtml(reward.name)} added as your complimentary Tic-Tac-Toe reward.</div>` : ""}<div class="mt-6 flex flex-wrap gap-3"><a href="#/game" class="rounded-xl bg-blue-700 px-5 py-3 font-extrabold text-white">Play Tic-Tac-Toe</a><span class="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700">Paid ${formatter.format(active.total)}</span></div></div></article>`;
+      tracker.innerHTML = `<article class="app-card overflow-hidden"><div class="flex flex-col justify-between gap-5 bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:p-8"><div><p class="text-sm font-bold text-blue-300">ACTIVE TOKEN</p><p class="mt-1 text-5xl font-black">#${escapeHtml(active.token)}</p><p class="mt-2 text-sm text-slate-300">${escapeHtml(elapsedText(active))} · Est. ${active.estimatedMinutes} min</p></div><div class="sm:text-right"><p class="text-sm font-bold text-slate-400">Current status</p><p class="mt-1 text-2xl font-black text-white">${escapeHtml(statusLabels[active.status])}</p><p class="mt-2 text-sm text-slate-300">${active.orderType === "dine-in" ? `Table ${escapeHtml(active.tableNumber)}` : "Takeaway"}</p></div></div><div class="p-6 sm:p-8">${statusTracker(active)}${countdownCard(active)}${reward ? `<div class="mt-5 rounded-xl bg-purple-50 p-4 text-sm font-bold text-purple-900">🎁 ${escapeHtml(reward.name)} added as your complimentary Tic-Tac-Toe reward.</div>` : ""}<div class="mt-6 flex flex-wrap gap-3"><a href="#/game" class="rounded-xl bg-blue-700 px-5 py-3 font-extrabold text-white">Play Tic-Tac-Toe</a><span class="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700">Paid ${formatter.format(active.total)}</span></div></div></article>`;
     } else {
       tracker.innerHTML = orders.length ? `<div class="app-card p-6 text-center"><p class="font-bold text-slate-600">You have no active order.</p></div>` : "";
     }
@@ -84,7 +123,7 @@
     };
     eligibility.innerHTML = `<p class="rounded-xl ${context.eligible ? "bg-green-50 text-green-900" : "bg-slate-100 text-slate-700"} p-4 text-sm font-bold leading-6">${escapeHtml(messages[context.reason])}</p>`;
     document.querySelector("[data-game-message]").textContent = messages[context.reason];
-    orderBox.innerHTML = context.order ? `<p class="text-3xl font-black text-slate-950">#${escapeHtml(context.order.token)}</p><p class="mt-1 text-sm font-bold text-blue-700">${escapeHtml(statusLabels[context.order.status])}</p><p class="mt-2 text-xs text-slate-500">${escapeHtml(elapsedText(context.order))}</p>` : `<p class="text-sm font-bold text-slate-500">No active paid order</p>`;
+    orderBox.innerHTML = context.order ? `<p class="text-3xl font-black text-slate-950">#${escapeHtml(context.order.token)}</p><p class="mt-1 text-sm font-bold text-blue-700">${escapeHtml(statusLabels[context.order.status])}</p><p class="mt-2 text-xs text-slate-500">${escapeHtml(elapsedText(context.order))}</p>${countdownCard(context.order)}` : `<p class="text-sm font-bold text-slate-500">No active paid order</p>`;
   }
 
   function winnerFor(cells) {
@@ -262,5 +301,5 @@
   renderTracking();
   renderBoard();
   if (global.location.hash === "#/game") startGame();
-  global.setInterval(renderTracking, 30000);
+  global.setInterval(() => { simulatePreparation(); renderTracking(); }, 1000);
 })(window);
