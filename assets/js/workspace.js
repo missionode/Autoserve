@@ -83,6 +83,10 @@
   const defaultRoute = workspace === "customer" ? "home" : "dashboard";
   global.AutoCodeApp.initHashRoutes(defaultRoute);
 
+  document.querySelectorAll(".desktop-nav-more [data-route-link]").forEach((link) => link.addEventListener("click", () => {
+    link.closest("details")?.removeAttribute("open");
+  }));
+
   global.AutoCodeState.subscribe((state, metadata) => {
     const syncMessage = document.querySelector("[data-sync-message]");
     if (!syncMessage || metadata.source !== "storage") return;

@@ -2,11 +2,13 @@
   "use strict";
 
   const STORAGE_KEY = "autocode.prototype.state";
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 7;
   const listeners = new Set();
 
   const now = () => new Date().toISOString();
   const clone = (value) => JSON.parse(JSON.stringify(value));
+  const createAdministrativeToken = () => String(Math.floor(100000 + Math.random() * 900000));
+  const nextLocalMidnight = () => { const date = new Date(); date.setHours(24, 0, 0, 0); return date.toISOString(); };
 
   function seedState() {
     const createdAt = now();
@@ -25,6 +27,15 @@
           status: "open",
           currency: "INR",
           taxPercent: 5,
+          dineInEnabled: true,
+          takeawayEnabled: true,
+          dineInServiceMode: "both",
+          tableNumbers: ["T01", "T02", "T03", "T04", "T05", "T06"],
+          brandLogoPath: "assets/images/branding/demo-kitchen-logo.jpg",
+          complaintPhone: "+91 90000 00999",
+          qrGuestMessage: "Scan to view the menu and place your order",
+          administrativeToken: createAdministrativeToken(),
+          administrativeTokenExpiresAt: nextLocalMidnight(),
           tokenStart: 100,
           nextToken: 100,
           nextKot: 1,
@@ -92,6 +103,7 @@
           emergencyCutoff: false,
           preparationMinutes: 12,
           icon: "🍔",
+          imagePath: "assets/images/menu/classic-veg-burger.jpg",
           sizes: [
             { id: "regular", name: "Regular", priceAdjustment: 0 },
             { id: "large", name: "Large", priceAdjustment: 60 }
@@ -118,6 +130,7 @@
           emergencyCutoff: false,
           preparationMinutes: 6,
           icon: "🍟",
+          imagePath: "assets/images/menu/seasoned-fries.jpg",
           sizes: [
             { id: "regular", name: "Regular", priceAdjustment: 0 },
             { id: "large", name: "Large", priceAdjustment: 45 }
@@ -144,6 +157,7 @@
           emergencyCutoff: false,
           preparationMinutes: 4,
           icon: "🥤",
+          imagePath: "assets/images/menu/cold-coffee.jpg",
           sizes: [
             { id: "regular", name: "Regular", priceAdjustment: 0 },
             { id: "large", name: "Large", priceAdjustment: 40 }
@@ -171,6 +185,7 @@
           emergencyCutoff: false,
           preparationMinutes: 5,
           icon: "🍫",
+          imagePath: "assets/images/menu/chocolate-brownie.jpg",
           sizes: [{ id: "regular", name: "Regular", priceAdjustment: 0 }],
           spiceLevels: [],
           addOns: [
@@ -221,6 +236,40 @@
         order.kotStatus ||= order.status === "delivered" ? "served" : order.status === "ready" ? "ready" : order.status === "preparing" ? "preparing" : "new";
       });
       state.schemaVersion = 3;
+    }
+    if (state.schemaVersion === 3) {
+      state.restaurants.forEach((restaurant) => {
+        restaurant.dineInEnabled ??= true;
+        restaurant.takeawayEnabled ??= true;
+        restaurant.dineInServiceMode ||= "both";
+        restaurant.tableNumbers ||= ["T01", "T02", "T03", "T04", "T05", "T06"];
+      });
+      state.schemaVersion = 4;
+    }
+    if (state.schemaVersion === 4) {
+      const menuImages = {
+        item_burger: "assets/images/menu/classic-veg-burger.jpg",
+        item_fries: "assets/images/menu/seasoned-fries.jpg",
+        item_cold_coffee: "assets/images/menu/cold-coffee.jpg",
+        item_brownie: "assets/images/menu/chocolate-brownie.jpg"
+      };
+      state.menuItems.forEach((item) => { item.imagePath ||= menuImages[item.id] || null; });
+      state.schemaVersion = 5;
+    }
+    if (state.schemaVersion === 5) {
+      state.restaurants.forEach((restaurant) => {
+        restaurant.brandLogoPath ||= "assets/images/branding/demo-kitchen-logo.jpg";
+        restaurant.complaintPhone ||= restaurant.contactPhone || "+91 90000 00999";
+        restaurant.qrGuestMessage ||= "Scan to view the menu and place your order";
+      });
+      state.schemaVersion = 6;
+    }
+    if (state.schemaVersion === 6) {
+      state.restaurants.forEach((restaurant) => {
+        restaurant.administrativeToken ||= createAdministrativeToken();
+        restaurant.administrativeTokenExpiresAt ||= nextLocalMidnight();
+      });
+      state.schemaVersion = 7;
     }
     if (state.schemaVersion < SCHEMA_VERSION) throw new Error("No migration is available for this prototype data.");
     return state;

@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const customerHtml = read("customers/index.html");
 const restaurantHtml = read("restaurants/index.html");
+const themeCss = read("assets/css/theme.css");
 const scripts = Object.fromEntries(fs.readdirSync(path.join(root, "assets/js")).filter((name) => name.endsWith(".js")).map((name) => [name, read(`assets/js/${name}`)]));
 
 function stateHarness(initialRaw) {
@@ -32,7 +33,10 @@ test("every SPA navigation link has a route panel", () => {
 
 test("all referenced local scripts exist and parse", () => {
   for (const html of [customerHtml, restaurantHtml]) {
-    for (const match of html.matchAll(/src="\.\.\/(assets\/js\/[^"]+)"/g)) assert.ok(fs.existsSync(path.join(root, match[1])), `missing ${match[1]}`);
+    for (const match of html.matchAll(/src="\.\.\/(assets\/js\/[^"]+)"/g)) {
+      const localPath = match[1].split("?")[0];
+      assert.ok(fs.existsSync(path.join(root, localPath)), `missing ${localPath}`);
+    }
   }
   for (const [name, source] of Object.entries(scripts)) assert.doesNotThrow(() => new vm.Script(source, { filename: name }));
 });
@@ -117,8 +121,143 @@ test("responsive, keyboard, dialog, and recovery structures are represented", ()
     assert.match(html, /data-mobile-menu-backdrop/);
     assert.match(html, /data-close-mobile-menu/);
   }
+  assert.match(themeCss, /@media \(min-width: 768px\)[\s\S]*?\.mobile-menu-button,[\s\S]*?display: none !important;/);
   assert.match(scripts["workspace.js"], /event\.key !== "Escape"/);
   assert.match(scripts["workspace.js"], /closest\("\[data-route-link\]"\)/);
+});
+
+test("customer-facing ordering language matches a restaurant workflow", () => {
+  for (const label of ["View order", "Add to order", "Edit order", "Your order", "Review and pay"]) assert.match(customerHtml, new RegExp(label));
+  for (const legacyLabel of [">Cart<", "Add to cart", "Edit cart", "Your cart", "in cart"]) assert.doesNotMatch(customerHtml, new RegExp(legacyLabel, "i"));
+  assert.match(scripts["menu.js"], /Item added to your order/);
+  assert.match(scripts["checkout.js"], /Your order has been preserved/);
+});
+
+test("menu cards disclose defaults and support one-tap ordering", () => {
+  assert.match(scripts["menu.js"], /Quick-add defaults/);
+  assert.match(scripts["menu.js"], /No add-ons/);
+  assert.match(scripts["menu.js"], /data-quick-add=/);
+  assert.match(scripts["menu.js"], /aria-hidden="true">⚡<\/span><span>Quick add/);
+  assert.match(scripts["menu.js"], /function quickAddItem/);
+  assert.match(scripts["menu.js"], /item\.sizes\?\.\[0\]/);
+  assert.match(scripts["menu.js"], /item\.spiceLevels\?\.\[0\]/);
+  assert.match(scripts["menu.js"], /quick-order-item-added/);
+});
+
+test("digital menu uses local restaurant photography with accessible fallbacks", () => {
+  for (const image of ["classic-veg-burger.jpg", "seasoned-fries.jpg", "cold-coffee.jpg", "chocolate-brownie.jpg"]) {
+    assert.ok(fs.existsSync(path.join(root, "assets/images/menu", image)), `missing menu photograph ${image}`);
+    assert.match(scripts["state.js"], new RegExp(image.replace(".", "\\.")));
+  }
+  assert.match(scripts["menu.js"], /itemVisual\(item/);
+  assert.match(scripts["menu.js"], /loading="lazy" decoding="async"/);
+  assert.match(customerHtml, /data-item-image hidden/);
+  assert.match(scripts["checkout.js"], /imageSource\(item\)/);
+  assert.match(scripts["hotel-availability.js"], /hydrateFoodImages\(list, items\)/);
+  assert.match(scripts["administration.js"], /hydrateFoodImages\(list, items\)/);
+  assert.match(scripts["administration.js"], /hydrateFoodImages\(document\.querySelector\("\[data-admin-menu-list\]"\), items\)/);
+  for (const name of ["menu.js", "checkout.js", "hotel-availability.js", "administration.js"]) assert.match(scripts[name], /imagePath \|\| item\?*\.imageUrl|item\?\.imagePath \|\| item\?\.imageUrl/);
+});
+
+test("checkout respects restaurant fulfillment preferences", () => {
+  assert.match(customerHtml, /data-service-preference/);
+  assert.match(customerHtml, /data-service-option="self-service"/);
+  assert.match(customerHtml, /data-service-option="table-service"/);
+  assert.match(customerHtml, /name="terms" value="accepted" type="checkbox" checked/);
+  assert.match(scripts["state.js"], /dineInServiceMode: "both"/);
+  assert.match(scripts["admin-settings.js"], /name="dineInServiceMode"/);
+  assert.match(scripts["admin-settings.js"], /Self-service pickup only/);
+  assert.match(scripts["admin-settings.js"], /Table service only/);
+  assert.match(scripts["checkout.js"], /serviceField\.hidden = orderType !== "dine-in"/);
+  assert.match(scripts["checkout.js"], /orderType === "takeaway" \? "self-service"/);
+  assert.match(scripts["checkout.js"], /serviceMode !== configuredMode/);
+});
+
+test("staff delegated actions use a reloadable daily administrative token", () => {
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 7/);
+  assert.match(scripts["state.js"], /administrativeToken: createAdministrativeToken\(\)/);
+  assert.match(scripts["state.js"], /administrativeTokenExpiresAt: nextLocalMidnight\(\)/);
+  assert.match(scripts["admin-settings.js"], /Daily administrative token/);
+  assert.match(scripts["admin-settings.js"], /data-reload-admin-token/);
+  assert.match(scripts["admin-settings.js"], /rotateAdministrativeToken\("manual_reload"\)/);
+  assert.match(scripts["admin-settings.js"], /scheduleAdministrativeTokenRotation\(\)/);
+  assert.match(scripts["history-reports.js"], /submittedToken === restaurant\?\.administrativeToken/);
+  assert.match(scripts["history-reports.js"], /administrativeTokenExpiresAt/);
+  assert.match(scripts["history-reports.js"], /expired_administrative_token/);
+});
+
+test("all availability statuses collect and enforce meaningful details", () => {
+  assert.match(scripts["hotel-availability.js"], /Quantity remaining/);
+  assert.match(scripts["hotel-availability.js"], /Quantity ready to sell/);
+  assert.match(scripts["hotel-availability.js"], /Staff reason/);
+  assert.match(scripts["hotel-availability.js"], /\["available", "limited"\]\.includes/);
+  assert.match(scripts["hotel-availability.js"], /\["unavailable", "sold-out"\]\.includes/);
+  assert.match(scripts["hotel-availability.js"], /item\.availableQuantity/);
+  assert.match(scripts["hotel-availability.js"], /item\.availabilityNote/);
+  assert.match(scripts["menu.js"], /Only \$\{availableQuantity\(item\)\} left/);
+  assert.match(scripts["checkout.js"], /quantity > remaining/);
+  assert.match(scripts["checkout.js"], /item\.availableQuantity === 0/);
+});
+
+test("adding food briefly confirms the selection and exposes a compact order review action", () => {
+  assert.match(customerHtml, /data-floating-order/);
+  assert.match(customerHtml, /data-floating-order-count/);
+  assert.match(customerHtml, /data-floating-order-total/);
+  assert.match(customerHtml, /customer-order-action\.js\?v=/);
+  assert.match(scripts["menu.js"], /feedbackDismissTimer = global\.setTimeout/);
+  assert.match(scripts["menu.js"], /}, 2400\)/);
+  assert.match(scripts["customer-order-action.js"], /hasItems && route !== "checkout"/);
+  assert.match(scripts["customer-order-action.js"], /AutoCodeState\.subscribe/);
+  assert.match(scripts["customer-order-action.js"], /addEventListener\("hashchange", synchronizeRouteVisibility\)/);
+  assert.match(themeCss, /\.floating-order-action\.is-visible\s*{\s*display: inline-flex;/);
+  assert.match(scripts["customer-order-action.js"], /Review your order:/);
+});
+
+test("customer desktop header provides navigation without the mobile menu", () => {
+  assert.match(customerHtml, /<nav class="desktop-navigation" aria-label="Customer navigation">/);
+  assert.match(themeCss, /@media \(min-width: 768px\)[\s\S]*?\.desktop-navigation\s*{[\s\S]*?display: flex;/);
+  assert.match(themeCss, /\.mobile-menu-button,[\s\S]*?display: none !important;/);
+});
+
+test("restaurant desktop header provides role-aware operations navigation", () => {
+  assert.match(restaurantHtml, /<nav class="desktop-navigation" aria-label="Restaurant navigation">/);
+  assert.match(restaurantHtml, /data-route-link="dashboard"/);
+  assert.match(restaurantHtml, /data-admin-only class="desktop-nav-more"/);
+  for (const route of ["admin", "settings", "data", "qr"]) assert.match(restaurantHtml, new RegExp(`data-route-link="${route}"`));
+  assert.match(themeCss, /\.desktop-nav-more > div/);
+  assert.match(scripts["workspace.js"], /\.desktop-nav-more \[data-route-link\]/);
+});
+
+test("workspace headers remain compact across tablet and desktop sizes", () => {
+  for (const html of [restaurantHtml, customerHtml]) {
+    assert.match(html, /data-route-link="help"[^>]*class="desktop-nav-icon"/);
+    assert.match(html, /aria-label="Help and FAQ"/);
+    assert.doesNotMatch(html, /order-3 flex w-full/);
+  }
+  assert.match(themeCss, /@media \(min-width: 768px\) and \(max-width: 1023px\)/);
+  assert.match(themeCss, /\.mobile-menu-button\s*{\s*display: inline-flex !important;/);
+  assert.match(themeCss, /\.desktop-navigation \.desktop-nav-icon/);
+});
+
+test("meaningful CTAs receive consistent accessible icons across user roles", () => {
+  assert.match(scripts["app.js"], /function iconForAction/);
+  assert.match(scripts["app.js"], /new MutationObserver/);
+  assert.match(scripts["app.js"], /element\.closest\("nav"\)/);
+  assert.match(scripts["app.js"], /element\.querySelector\('\[aria-hidden="true"\]'\)/);
+  for (const icon of ["cart", "save", "trash", "edit", "print", "qr", "camera", "logout", "receipt"]) assert.match(scripts["app.js"], new RegExp(`${icon}:`));
+  assert.match(themeCss, /\.icon-cta\s*{/);
+  assert.match(themeCss, /\.cta-icon svg\s*{/);
+});
+
+test("every mobile workspace destination receives a corresponding menu icon", () => {
+  assert.match(scripts["app.js"], /const navigationIcons =/);
+  for (const route of ["home", "menu", "orders", "game", "profile", "help", "dashboard", "inventory", "history", "reports", "admin", "settings", "data", "qr"]) {
+    assert.match(scripts["app.js"], new RegExp(`${route}:`));
+  }
+  assert.match(scripts["app.js"], /\.mobile-navigation \[data-route-link\]/);
+  assert.match(scripts["app.js"], /data\.menuIcon|dataset\.menuIcon/);
+  assert.match(themeCss, /\.mobile-nav-icon\s*{/);
+  assert.match(themeCss, /\.mobile-navigation a\[aria-current="page"\] \.mobile-nav-icon/);
 });
 
 test("store QR entry preserves restaurant and table context through authentication", () => {
@@ -129,6 +268,51 @@ test("store QR entry preserves restaurant and table context through authenticati
   assert.match(scripts["customer-entry.js"], /entryContext/);
   assert.match(scripts["auth.js"], /returnTo.*customers/s);
   assert.match(scripts["checkout.js"], /entryContext\?\.tableNumber/);
+  assert.match(scripts["state.js"], /tableNumbers: \["T01"/);
+  assert.match(scripts["state.js"], /if \(state\.schemaVersion === 3\)/);
+  assert.match(scripts["admin-settings.js"], /name="tableNumbers"/);
+  assert.match(scripts["admin-settings.js"], /restaurant\.tableNumbers \|\| \[\]/);
+  assert.match(scripts["qr-entry.js"], /value="counter"/);
+  assert.match(scripts["qr-entry.js"], /value="table"/);
+  assert.match(scripts["qr-entry.js"], /configuredTables\.includes\(table\)/);
+  assert.match(scripts["qr-entry.js"], /searchParams\.set\("service"/);
+  assert.match(scripts["customer-entry.js"], /serviceMode: serviceReference/);
+  assert.match(scripts["checkout.js"], /entryContext\?\.serviceMode/);
+});
+
+test("QR cards include configurable restaurant branding and print details", () => {
+  assert.ok(fs.existsSync(path.join(root, "assets/images/branding/demo-kitchen-logo.jpg")), "missing demo restaurant logo");
+  for (const field of ["brandLogoPath", "complaintPhone", "qrGuestMessage"]) {
+    assert.match(scripts["state.js"], new RegExp(field));
+    assert.match(scripts["admin-settings.js"], new RegExp(`name="${field}"`));
+  }
+  assert.match(scripts["qr-entry.js"], /data-printable-qr/);
+  assert.match(scripts["qr-entry.js"], /Powered by<\/span><img src="\.\.\/design_template\/Autoserve%20logo\.svg" alt="Autoserve"/);
+  assert.match(scripts["qr-entry.js"], /Questions or complaints/);
+  assert.match(scripts["qr-entry.js"], /restaurant\.brandLogoPath/);
+  assert.match(scripts["qr-entry.js"], /restaurant\.complaintPhone/);
+  assert.match(themeCss, /@media print/);
+  assert.match(themeCss, /@page \{ size: A5 portrait; margin: 0; \}/);
+  assert.match(themeCss, /\[data-printable-qr\]/);
+  assert.match(scripts["qr-entry.js"], /document\.title = ""/);
+  assert.match(scripts["qr-entry.js"], /afterprint/);
+  assert.match(scripts["qr-entry.js"], /All restaurant tables/);
+  assert.match(scripts["qr-entry.js"], /configuredTables\.slice\(1\)/);
+  assert.match(scripts["qr-entry.js"], /card\.classList\.add\("qr-print-copy"\)/);
+  assert.match(themeCss, /width: 148mm; height: 210mm/);
+  assert.match(themeCss, /\[data-printable-qr\]:last-child/);
+});
+
+test("customer home opens a validated camera QR ordering flow", () => {
+  assert.match(customerHtml, /data-open-qr-scanner/);
+  assert.match(customerHtml, /id="qr-scanner-dialog"/);
+  assert.match(customerHtml, /data-qr-video/);
+  assert.match(customerHtml, /customer-qr-scanner\.js/);
+  assert.match(scripts["customer-qr-scanner.js"], /getUserMedia/);
+  assert.match(scripts["customer-qr-scanner.js"], /BarcodeDetector/);
+  assert.match(scripts["customer-qr-scanner.js"], /target\.origin !== global\.location\.origin/);
+  assert.match(scripts["customer-qr-scanner.js"], /target\.searchParams\.get\("restaurant"\)/);
+  assert.match(scripts["customer-qr-scanner.js"], /getTracks\(\).*track\.stop/);
 });
 
 test("paid hotel orders generate KOTs, wait in the game, and use service-aware ready notices", () => {

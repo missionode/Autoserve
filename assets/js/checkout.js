@@ -14,6 +14,7 @@
   if (!checkoutForm || !paymentDialog || !paymentForm) return;
 
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
+  const imageSource = (item) => { const image = item?.imagePath || item?.imageUrl || ""; return image ? (image.startsWith("http") ? image : `../${image.replace(/^\/+/, "")}`) : ""; };
   const createId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   function cartFor(state) {
@@ -45,7 +46,7 @@
 
   function validateCart(state) {
     const cart = cartFor(state);
-    if (!cart || !cart.items.length) throw new Error("Your cart is empty. Add an item before checkout.");
+    if (!cart || !cart.items.length) throw new Error("Your order is empty. Add an item before checkout.");
     const restaurant = state.restaurants.find((item) => item.id === restaurantId);
     if (!restaurant || restaurant.status !== "open") throw new Error("This restaurant is currently closed and cannot accept new orders.");
     const requested = new Map();
@@ -61,6 +62,8 @@
     requested.forEach((quantity, itemId) => {
       const item = state.menuItems.find((candidate) => candidate.id === itemId && candidate.restaurantId === restaurantId);
       if (!item || item.status !== "published" || item.emergencyCutoff || ["unavailable", "sold-out", "cutoff"].includes(item.availabilityStatus)) throw new Error(`${item?.name || "An item"} is no longer available.`);
+      const remaining = Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0));
+      if (quantity > remaining) throw new Error(`Only ${remaining} ${item.name} available. Update your order before payment.`);
     });
     return cart;
   }
@@ -75,7 +78,8 @@
       container.hidden = items.length === 0;
       container.innerHTML = items.map((entry) => {
         const item = state.menuItems.find((candidate) => candidate.id === entry.itemId);
-        return `<div class="flex gap-3 py-4"><span class="text-2xl">${escapeHtml(item?.icon || "🍽️")}</span><div class="min-w-0 flex-1"><p class="font-extrabold text-slate-900">${entry.quantity} × ${escapeHtml(item?.name || "Item")}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml([entry.sizeId, entry.spiceLevel].filter(Boolean).join(" · "))}</p></div><p class="font-bold text-slate-800">${formatter.format(entry.unitPrice * entry.quantity)}</p></div>`;
+        const visual = imageSource(item) ? `<img src="${escapeHtml(imageSource(item))}" alt="" class="size-14 shrink-0 rounded-xl object-cover" loading="lazy">` : `<span class="text-2xl">${escapeHtml(item?.icon || "🍽️")}</span>`;
+        return `<div class="flex gap-3 py-4">${visual}<div class="min-w-0 flex-1"><p class="font-extrabold text-slate-900">${entry.quantity} × ${escapeHtml(item?.name || "Item")}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml([entry.sizeId, entry.spiceLevel].filter(Boolean).join(" · "))}</p></div><p class="font-bold text-slate-800">${formatter.format(entry.unitPrice * entry.quantity)}</p></div>`;
       }).join("");
       const totals = totalsFor(cart, state);
       document.querySelector("[data-checkout-subtotal]").textContent = formatter.format(totals.subtotal);
@@ -96,13 +100,38 @@
     }
     const table = new URLSearchParams(global.location.search).get("table") || state.activeSession?.entryContext?.tableNumber;
     if (table) document.querySelector("[data-checkout-table]").value = table.slice(0, 20);
+    const serviceMode = new URLSearchParams(global.location.search).get("service") || state.activeSession?.entryContext?.serviceMode;
+    const serviceInput = checkoutForm.querySelector(`input[name="serviceMode"][value="${serviceMode}"]`);
+    if (serviceInput) serviceInput.checked = true;
   }
 
   function toggleOrderType() {
-    const orderType = new FormData(checkoutForm).get("orderType");
+    const restaurant = global.AutoCodeState.read().restaurants.find((item) => item.id === restaurantId);
+    const dineInInput = checkoutForm.querySelector('input[name="orderType"][value="dine-in"]');
+    const takeawayInput = checkoutForm.querySelector('input[name="orderType"][value="takeaway"]');
+    dineInInput.disabled = restaurant?.dineInEnabled === false;
+    takeawayInput.disabled = restaurant?.takeawayEnabled === false;
+    dineInInput.closest("label").hidden = dineInInput.disabled;
+    takeawayInput.closest("label").hidden = takeawayInput.disabled;
+    if (dineInInput.checked && dineInInput.disabled) takeawayInput.checked = true;
+    if (takeawayInput.checked && takeawayInput.disabled) dineInInput.checked = true;
+    const orderType = checkoutForm.querySelector('input[name="orderType"]:checked')?.value;
     const field = document.querySelector("[data-table-field]");
     field.hidden = orderType !== "dine-in";
     field.querySelector("input").required = orderType === "dine-in";
+    const serviceField = document.querySelector("[data-service-preference]");
+    serviceField.hidden = orderType !== "dine-in";
+    const configuredMode = ["self-service", "table-service"].includes(restaurant?.dineInServiceMode) ? restaurant.dineInServiceMode : "both";
+    const allowedModes = configuredMode === "both" ? ["self-service", "table-service"] : [configuredMode];
+    serviceField.querySelectorAll("[data-service-option]").forEach((option) => {
+      const input = option.querySelector("input");
+      const allowed = orderType === "dine-in" && allowedModes.includes(input.value);
+      option.hidden = !allowed;
+      input.disabled = !allowed;
+    });
+    if (orderType === "dine-in" && !allowedModes.includes(serviceField.querySelector('input:checked')?.value)) {
+      serviceField.querySelector(`input[value="${allowedModes[0]}"]`).checked = true;
+    }
   }
 
   function validateCheckout() {
@@ -110,7 +139,7 @@
     const customerName = String(data.get("customerName") || "").trim();
     const mobile = String(data.get("mobile") || "").trim();
     const orderType = String(data.get("orderType") || "");
-    const serviceMode = String(data.get("serviceMode") || "self-service");
+    const serviceMode = orderType === "takeaway" ? "self-service" : String(data.get("serviceMode") || "");
     const tableNumber = String(data.get("tableNumber") || "").trim();
     if (!customerName) throw new Error("Enter the customer name.");
     if (!/^\d{10}$/.test(mobile)) throw new Error("Enter a valid 10-digit mobile number.");
@@ -120,6 +149,8 @@
     const restaurant = global.AutoCodeState.read().restaurants.find((item) => item.id === restaurantId);
     if (orderType === "dine-in" && restaurant?.dineInEnabled === false) throw new Error("Dine-in ordering is currently unavailable.");
     if (orderType === "takeaway" && restaurant?.takeawayEnabled === false) throw new Error("Takeaway ordering is currently unavailable.");
+    const configuredMode = ["self-service", "table-service"].includes(restaurant?.dineInServiceMode) ? restaurant.dineInServiceMode : "both";
+    if (orderType === "dine-in" && configuredMode !== "both" && serviceMode !== configuredMode) throw new Error("Choose a service option offered by this restaurant.");
     if (orderType === "dine-in" && !tableNumber) throw new Error("Enter the table number for a dine-in order.");
     if (data.get("terms") !== "accepted") throw new Error("Accept the prototype payment terms before continuing.");
     const state = global.AutoCodeState.read();
@@ -194,9 +225,18 @@
         const item = state.menuItems.find((candidate) => candidate.id === entry.itemId);
         const size = (item.sizes || []).find((option) => option.id === entry.sizeId);
         const addOns = (item.addOns || []).filter((option) => entry.addOnIds.includes(option.id));
-        return { ...entry, name: item.name, icon: item.icon, basePrice: item.price, sizeName: size?.name || "Regular", addOns: addOns.map((option) => ({ id: option.id, name: option.name, price: option.price })), lineTotal: entry.unitPrice * entry.quantity };
+        return { ...entry, name: item.name, icon: item.icon, imagePath: item.imagePath || item.imageUrl || null, basePrice: item.price, sizeName: size?.name || "Regular", addOns: addOns.map((option) => ({ id: option.id, name: option.name, price: option.price })), lineTotal: entry.unitPrice * entry.quantity };
       });
       const createdAt = new Date().toISOString();
+      cart.items.forEach((entry) => {
+        const item = state.menuItems.find((candidate) => candidate.id === entry.itemId);
+        item.availableQuantity = Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0) - entry.quantity);
+        if (item.availableQuantity === 0) {
+          item.availabilityStatus = "sold-out";
+          item.availabilityNote = "Sold out through customer orders";
+        }
+        item.updatedAt = createdAt;
+      });
       const kotNumber = String(kotValue).padStart(4, "0");
       const kotSnapshot = { number: kotNumber, tableNumber: checkoutDraft.tableNumber, serviceMode: checkoutDraft.serviceMode, orderType: checkoutDraft.orderType, items: JSON.parse(JSON.stringify(snapshots)), instructions: checkoutDraft.orderNotes, generatedAt: createdAt };
       state.orders.push({ id: orderId, restaurantId, customerId: session.id, customerName: checkoutDraft.customerName, mobile: checkoutDraft.mobile, orderType: checkoutDraft.orderType, serviceMode: checkoutDraft.serviceMode, tableNumber: checkoutDraft.tableNumber, orderNotes: checkoutDraft.orderNotes, token: String(tokenValue).padStart(3, "0"), kotNumber, kotStatus: "new", kotSnapshot, status: "payment_confirmed", paymentStatus: "success", paymentId: payment?.id || null, transactionId, items: snapshots, paidSnapshot: { items: JSON.parse(JSON.stringify(snapshots)), subtotal: totals.subtotal, tax: totals.tax, taxPercent: totals.taxPercent, total: totals.total, capturedAt: createdAt }, subtotal: totals.subtotal, tax: totals.tax, taxPercent: totals.taxPercent, total: totals.total, estimatedMinutes: Math.max(...snapshots.map((item) => state.menuItems.find((candidate) => candidate.id === item.itemId)?.preparationMinutes || 5)), createdAt, updatedAt: createdAt, timeline: [{ type: "order_created", label: "Paid order created", at: createdAt, actor: "customer" }, { type: "payment_confirmed", label: "Payment confirmed", at: createdAt, actor: "system" }, { type: "kot_generated", label: `KOT #${kotNumber} generated`, at: createdAt, actor: "system" }, { type: "token_allocated", label: `Token #${String(tokenValue).padStart(3, "0")} allocated`, at: createdAt, actor: "system" }] });
@@ -244,7 +284,7 @@
       }
       if (outcome === "failure") {
         recordNonSuccess("failure", methodData);
-        setPaymentFeedback("Payment failed. Your cart and inventory allocation are unchanged. You can retry.", "error");
+        setPaymentFeedback("Payment failed. Your order and inventory allocation are unchanged. You can retry.", "error");
         checkoutDraft.attemptId = createId("attempt");
         document.querySelector("[data-payment-fields]").hidden = false;
         document.querySelector("[data-pending-resolution]").hidden = true;
@@ -253,7 +293,7 @@
       }
       if (outcome === "cancelled") {
         recordNonSuccess("cancelled", methodData);
-        setCheckoutFeedback("Payment was cancelled. Your cart has been preserved.", true);
+        setCheckoutFeedback("Payment was cancelled. Your order has been preserved.", true);
         global.AutoCodeApp.closeDialog(paymentDialog, "cancelled");
         return;
       }
@@ -277,7 +317,7 @@
       recordNonSuccess("cancelled", { method: String(data.get("upiMethod") || "mock-app"), upiId: String(data.get("upiId") || "").trim() || null });
     }
     global.AutoCodeApp.closeDialog(paymentDialog, "cancelled");
-    setCheckoutFeedback("Payment was cancelled. Your cart has been preserved.", true);
+    setCheckoutFeedback("Payment was cancelled. Your order has been preserved.", true);
   });
   document.querySelectorAll("[data-resolve-payment]").forEach((button) => button.addEventListener("click", () => { const data = paymentMethodData(); resolveOutcome(button.dataset.resolvePayment, data); }));
   global.addEventListener("hashchange", () => { if (global.location.hash === "#/checkout") renderCheckout(); if (global.location.hash === "#/confirmation") { const state = global.AutoCodeState.read(); renderConfirmation(state.activeSession?.lastOrderId); } });

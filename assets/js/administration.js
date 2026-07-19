@@ -23,6 +23,17 @@
   const idPart = (value) => String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 32) || "option";
   const createId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const now = () => new Date().toISOString();
+  const imageSource = (item) => { const image = item?.imagePath || item?.imageUrl || ""; return image ? (/^https?:\/\//i.test(image) ? image : `../${image.replace(/^\/+/, "")}`) : ""; };
+  function hydrateFoodImages(container, items) {
+    items.forEach((item, index) => {
+      const source = imageSource(item);
+      const icon = container.children[index]?.querySelector(".text-3xl");
+      if (!source || !icon) return;
+      const image = document.createElement("img");
+      image.src = source; image.alt = item.name; image.loading = "lazy"; image.className = "size-16 shrink-0 rounded-xl object-cover";
+      icon.replaceWith(image);
+    });
+  }
   const itemsFor = (state) => state.menuItems.filter((item) => item.restaurantId === restaurantId);
   const categoriesFor = (state) => state.categories.filter((category) => category.restaurantId === restaurantId).sort((a, b) => a.order - b.order);
   const categoryName = (state, id) => state.categories.find((category) => category.id === id)?.name || "Unassigned";
@@ -75,6 +86,7 @@
       const rewardLabel = item.id === state.restaurants.find((entry) => entry.id === restaurantId)?.primaryRewardItemId ? "Primary reward" : "Fallback reward";
       return `<article class="app-card p-5"><div class="flex items-start justify-between gap-4"><div class="flex gap-3"><span class="text-3xl" aria-hidden="true">${escapeHtml(item.icon || "🍽️")}</span><div><h2 class="font-black text-slate-950">${escapeHtml(item.name)}</h2><p class="mt-1 text-xs font-bold text-slate-500">${escapeHtml(categoryName(state, item.categoryId))}</p></div></div><span class="rounded-full px-2.5 py-1 text-xs font-extrabold ${status.tone === "red" ? "bg-red-100 text-red-800" : status.tone === "amber" ? "bg-amber-100 text-amber-900" : status.tone === "green" ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-700"}">${status.label}</span></div><div class="mt-5 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 text-sm"><div><p class="text-xs font-bold text-slate-500">Current stock</p><p class="mt-1 text-2xl font-black text-slate-950">${item.stock}</p></div><div><p class="text-xs font-bold text-slate-500">Low at</p><p class="mt-1 font-black text-slate-800">${item.lowStockThreshold}</p></div><div class="col-span-2"><p class="text-xs font-bold text-slate-500">Last update</p><p class="mt-1 text-xs font-semibold text-slate-700">${new Date(item.updatedAt).toLocaleString("en-IN")}${item.lastUpdatedByName ? ` · ${escapeHtml(item.lastUpdatedByName)}` : ""}</p></div></div>${reward ? `<p class="mt-3 rounded-lg bg-purple-50 px-3 py-2 text-xs font-extrabold text-purple-800">🎁 ${rewardLabel}</p>` : ""}<div class="mt-4 flex flex-wrap gap-2"><button data-adjust-stock="${escapeHtml(item.id)}" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">Adjust stock</button><button data-toggle-cutoff="${escapeHtml(item.id)}" class="rounded-lg border ${item.emergencyCutoff ? "border-green-400 text-green-800" : "border-red-300 text-red-700"} px-4 py-2 text-sm font-bold">${item.emergencyCutoff ? "Remove cutoff" : "Emergency cutoff"}</button></div></article>`;
     }).join("");
+    hydrateFoodImages(list, items);
     renderAudit(state);
   }
 
@@ -202,7 +214,7 @@
       menuForm.elements.stock.value = source.stock;
       menuForm.elements.lowStockThreshold.value = source.lowStockThreshold;
       menuForm.elements.icon.value = source.icon || "";
-      menuForm.elements.imageUrl.value = source.imageUrl || "";
+      menuForm.elements.imageUrl.value = source.imagePath || source.imageUrl || "";
       menuForm.elements.sizes.value = (source.sizes || []).map((entry) => `${entry.name}:${entry.priceAdjustment}`).join(", ");
       menuForm.elements.spiceLevels.value = (source.spiceLevels || []).join(", ");
       menuForm.elements.addOns.value = (source.addOns || []).map((entry) => `${entry.name}:${entry.price}`).join(", ");
@@ -225,7 +237,8 @@
     const image = menuForm.elements.imageUrl.value.trim();
     document.querySelector("[data-menu-preview-name]").textContent = name;
     document.querySelector("[data-menu-preview-price]").textContent = formatter.format(Number(menuForm.elements.price.value || 0));
-    document.querySelector("[data-menu-preview-image]").innerHTML = image ? `<img src="${escapeHtml(image)}" alt="" class="size-full object-cover">` : escapeHtml(icon);
+    const previewSource = image ? (/^https?:\/\//i.test(image) ? image : `../${image.replace(/^\/+/, "")}`) : "";
+    document.querySelector("[data-menu-preview-image]").innerHTML = previewSource ? `<img src="${escapeHtml(previewSource)}" alt="" class="size-full object-cover">` : escapeHtml(icon);
   }
 
   function saveMenu() {
@@ -258,7 +271,7 @@
           item = { id: createId("item"), restaurantId, emergencyCutoff: false, createdAt: now() };
           state.menuItems.push(item);
         }
-        Object.assign(item, { categoryId: String(data.get("categoryId")), name, description, price, dietary: String(data.get("dietary")), stock, lowStockThreshold: threshold, status: stock === 0 && status === "published" ? "sold-out" : status, preparationMinutes, icon: icon || "🍽️", imageUrl, sizes, spiceLevels: parseNames(data.get("spiceLevels"), "Spice level"), addOns, updatedAt: now(), lastUpdatedBy: session.id, lastUpdatedByName: session.name });
+        Object.assign(item, { categoryId: String(data.get("categoryId")), name, description, price, dietary: String(data.get("dietary")), stock, lowStockThreshold: threshold, status: stock === 0 && status === "published" ? "sold-out" : status, preparationMinutes, icon: icon || "🍽️", imagePath: imageUrl || null, imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl : "", sizes, spiceLevels: parseNames(data.get("spiceLevels"), "Spice level"), addOns, updatedAt: now(), lastUpdatedBy: session.id, lastUpdatedByName: session.name });
         if (previousStock !== stock) audit(state, item, selectedMenuId ? "menu_stock_update" : "initial_stock", previousStock, stock, "Menu editor");
       }, selectedMenuId ? "menu-item-updated" : "menu-item-created");
       global.AutoCodeApp.closeDialog(menuDialog, "saved");
@@ -272,7 +285,7 @@
     global.AutoCodeState.update((state) => {
       const item = itemsFor(state).find((entry) => entry.id === itemId);
       if (!item) return;
-      if (status === "published" && (!item.name || !item.categoryId || (!item.icon && !item.imageUrl))) throw new Error("Complete the name, category, and image before publishing.");
+      if (status === "published" && (!item.name || !item.categoryId || (!item.icon && !item.imagePath && !item.imageUrl))) throw new Error("Complete the name, category, and image before publishing.");
       item.status = status === "published" && item.stock === 0 ? "sold-out" : status;
       item.updatedAt = now();
       item.lastUpdatedBy = session.id;
@@ -287,6 +300,7 @@
     const items = itemsFor(state).filter((item) => (menuFilter === "all" || item.status === menuFilter) && `${item.name} ${item.description}`.toLowerCase().includes(menuSearch)).sort((a, b) => a.name.localeCompare(b.name));
     document.querySelector("[data-admin-menu-empty]").hidden = items.length > 0;
     document.querySelector("[data-admin-menu-list]").innerHTML = items.map((item) => `<article class="rounded-2xl border border-slate-200 p-4"><div class="flex items-start justify-between gap-3"><div class="flex gap-3"><span class="text-3xl">${escapeHtml(item.icon || "🍽️")}</span><div><h3 class="font-black text-slate-950">${escapeHtml(item.name)}</h3><p class="mt-1 text-xs font-bold text-slate-500">${escapeHtml(categoryName(state, item.categoryId))} · ${formatter.format(item.price)} · ${item.stock} in stock</p></div></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-extrabold capitalize text-slate-700">${escapeHtml(item.status.replace("-", " "))}</span></div><div class="mt-4 flex flex-wrap gap-2"><button data-edit-menu="${escapeHtml(item.id)}" class="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white">Edit & preview</button><button data-duplicate-menu="${escapeHtml(item.id)}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold">Duplicate</button>${item.status === "draft" ? `<button data-menu-status="published" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-green-300 px-3 py-2 text-xs font-bold text-green-800">Publish</button>` : ""}${["published", "sold-out"].includes(item.status) ? `<button data-menu-status="hidden" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800">Hide</button>` : ""}${item.status === "hidden" ? `<button data-menu-status="published" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-green-300 px-3 py-2 text-xs font-bold text-green-800">Publish</button>` : ""}${item.status !== "archived" ? `<button data-menu-status="archived" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-red-300 px-3 py-2 text-xs font-bold text-red-700">Archive</button>` : `<button data-menu-status="draft" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-blue-300 px-3 py-2 text-xs font-bold text-blue-700">Restore draft</button>`}</div></article>`).join("");
+    hydrateFoodImages(document.querySelector("[data-admin-menu-list]"), items);
     renderCategories(state);
   }
 

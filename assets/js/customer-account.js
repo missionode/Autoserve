@@ -73,7 +73,7 @@
         cart.updatedAt = new Date().toISOString();
       }, "customer-order-reordered");
       if (!added) showFeedback(skipped.join("; ") || "No currently available items could be reordered.", true);
-      else showFeedback(`${added} item(s) added at current prices.${skipped.length ? ` Skipped: ${skipped.join("; ")}.` : " Review your cart before checkout."}`, skipped.length > 0);
+      else showFeedback(`${added} item(s) added at current prices.${skipped.length ? ` Skipped: ${skipped.join("; ")}.` : " Review your order before checkout."}`, skipped.length > 0);
     } catch (error) { showFeedback(error.message, true); }
   }
 

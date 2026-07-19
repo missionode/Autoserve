@@ -19,11 +19,18 @@
   let activeCategory = "all";
   let searchTerm = "";
   let selectedItemId = null;
+  let feedbackDismissTimer = 0;
 
   if (!menuGrid || !itemDialog || !cartDialog) return;
 
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
-  const isAvailable = (item) => item.status === "published" && !["unavailable", "sold-out", "cutoff"].includes(item.availabilityStatus) && !item.emergencyCutoff;
+  const availableQuantity = (item) => Math.max(0, Number(item?.availableQuantity ?? item?.stock ?? 0));
+  const isAvailable = (item) => item.status === "published" && !["unavailable", "sold-out", "cutoff"].includes(item.availabilityStatus) && !item.emergencyCutoff && availableQuantity(item) > 0;
+  const availabilityMessage = (item) => item.availabilityStatus === "limited" ? `Only ${availableQuantity(item)} left` : isAvailable(item) ? `${availableQuantity(item)} available` : item.availabilityStatus === "sold-out" ? "Sold out today" : "Temporarily unavailable";
+  const imageSource = (item) => { const image = item?.imagePath || item?.imageUrl || ""; return image ? (image.startsWith("http") ? image : `../${image.replace(/^\/+/, "")}`) : ""; };
+  const itemVisual = (item, classes) => imageSource(item)
+    ? `<img src="${escapeHtml(imageSource(item))}" alt="${escapeHtml(item.name)}" class="${classes}" loading="lazy" decoding="async">`
+    : `<div class="${classes} flex items-center justify-center bg-blue-50 text-3xl" role="img" aria-label="${escapeHtml(item?.name || "Menu item")}">${escapeHtml(item?.icon || "🍽️")}</div>`;
 
   function readContext() {
     const state = global.AutoCodeState.read();
@@ -47,7 +54,7 @@
     let cart = currentCart(state);
     if (!cart) {
       const conflictingCart = state.carts.find((candidate) => candidate.ownerId === session.id && candidate.items.length > 0 && candidate.restaurantId !== restaurantId);
-      if (conflictingCart) throw new Error("Your existing cart belongs to another restaurant. Clear it before ordering here.");
+      if (conflictingCart) throw new Error("Your current order belongs to another restaurant. Clear it before ordering here.");
       cart = { id: `cart_${Date.now()}`, ownerId: session.id, customerId: session.id, restaurantId, items: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       state.carts.push(cart);
     }
@@ -75,7 +82,7 @@
       renderCategories(categories);
       if (restaurant?.status !== "open") {
         emptyState.hidden = true;
-        menuGrid.innerHTML = '<div class="app-card col-span-full border-amber-200 p-10 text-center"><div class="text-5xl">🕒</div><h2 class="mt-4 text-2xl font-black text-slate-950">Restaurant currently closed</h2><p class="mt-2 text-slate-600">Your cart is retained. Return during operating hours to review availability and checkout.</p></div>';
+        menuGrid.innerHTML = '<div class="app-card col-span-full border-amber-200 p-10 text-center"><div class="text-5xl">🕒</div><h2 class="mt-4 text-2xl font-black text-slate-950">Restaurant currently closed</h2><p class="mt-2 text-slate-600">Your order is retained. Return during operating hours to review availability and checkout.</p></div>';
         renderCart();
         return;
       }
@@ -88,12 +95,16 @@
       menuGrid.innerHTML = filtered.map((item) => {
         const available = restaurant?.status === "open" && isAvailable(item);
         const inCart = cartQuantityForItem(cart, item.id);
+        const defaultSize = item.sizes?.[0] || { id: "regular", name: "Regular", priceAdjustment: 0 };
+        const defaultSpice = item.spiceLevels?.[0] || "Standard preparation";
+        const defaultPrice = item.price + Number(defaultSize.priceAdjustment || 0);
         return `<article class="app-card group overflow-hidden">
-          <div class="flex aspect-[16/10] items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-100 text-7xl" role="img" aria-label="${escapeHtml(item.name)} illustration">${escapeHtml(item.icon || "🍽️")}</div>
+          ${itemVisual(item, "aspect-[16/10] w-full object-cover transition duration-300 group-hover:scale-[1.02]")}
           <div class="p-5">
-            <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-extrabold uppercase tracking-wider ${item.dietary === "vegetarian" ? "text-green-700" : "text-red-700"}">${escapeHtml(item.dietary)}</p><h3 class="mt-1 text-xl font-black text-slate-950">${escapeHtml(item.name)}</h3></div><p class="whitespace-nowrap font-black text-blue-800">${formatter.format(item.price)}</p></div>
+            <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-extrabold uppercase tracking-wider ${item.dietary === "vegetarian" ? "text-green-700" : "text-red-700"}">${escapeHtml(item.dietary)}</p><h3 class="mt-1 text-xl font-black text-slate-950">${escapeHtml(item.name)}</h3></div><p class="whitespace-nowrap font-black text-blue-800">${formatter.format(defaultPrice)}</p></div>
             <p class="mt-3 min-h-12 text-sm leading-6 text-slate-600">${escapeHtml(item.description)}</p>
-            <div class="mt-5 flex items-center justify-between gap-3"><div><p class="text-xs font-bold ${available ? "text-slate-500" : "text-red-700"}">${available ? item.availabilityStatus === "limited" ? "Limited availability" : "Available now" : "Unavailable"}</p>${inCart ? `<p class="mt-1 text-xs font-extrabold text-blue-700">${inCart} in cart</p>` : ""}</div><button type="button" data-open-item="${escapeHtml(item.id)}" ${available ? "" : "disabled"} class="rounded-xl px-4 py-2.5 text-sm font-extrabold ${available ? "bg-blue-700 text-white hover:bg-blue-800" : "cursor-not-allowed bg-slate-200 text-slate-500"}">${available ? "Customize" : "Unavailable"}</button></div>
+            <div class="mt-4 rounded-xl bg-slate-50 px-3 py-2.5"><p class="text-[0.6875rem] font-extrabold uppercase tracking-wider text-slate-500">Quick-add defaults</p><p class="mt-1 text-xs font-bold text-slate-700">${escapeHtml(defaultSize.name)} · ${escapeHtml(defaultSpice)} · No add-ons</p></div>
+            <div class="mt-4"><div class="flex items-center justify-between gap-3"><div><p class="text-xs font-bold ${available ? item.availabilityStatus === "limited" ? "text-amber-700" : "text-slate-500" : "text-red-700"}">${escapeHtml(availabilityMessage(item))}</p>${inCart ? `<p class="mt-1 text-xs font-extrabold text-blue-700">${inCart} in your order</p>` : ""}</div></div><div class="mt-3 grid grid-cols-2 gap-2"><button type="button" data-open-item="${escapeHtml(item.id)}" ${available ? "" : "disabled"} class="rounded-xl border px-3 py-2.5 text-sm font-extrabold ${available ? "border-blue-300 text-blue-700 hover:bg-blue-50" : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"}">${available ? "Customize" : "Unavailable"}</button><button type="button" data-quick-add="${escapeHtml(item.id)}" ${available ? "" : "disabled"} class="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-extrabold ${available ? "bg-blue-700 text-white hover:bg-blue-800" : "cursor-not-allowed bg-slate-200 text-slate-500"}">${available ? '<span aria-hidden="true">⚡</span><span>Quick add</span>' : "Unavailable"}</button></div></div>
           </div>
         </article>`;
       }).join("");
@@ -109,11 +120,17 @@
     if (!item || restaurant?.status !== "open" || !isAvailable(item)) return;
     selectedItemId = item.id;
     itemForm.reset();
-    itemForm.querySelector("[data-item-icon]").textContent = item.icon || "🍽️";
+    const itemImage = itemForm.querySelector("[data-item-image]");
+    const itemIcon = itemForm.querySelector("[data-item-icon]");
+    itemImage.hidden = !imageSource(item);
+    itemIcon.hidden = Boolean(imageSource(item));
+    itemImage.src = imageSource(item);
+    itemImage.alt = item.name;
+    itemIcon.textContent = item.icon || "🍽️";
     itemForm.querySelector("[data-item-name]").textContent = item.name;
     itemForm.querySelector("[data-item-description]").textContent = item.description;
-    itemForm.querySelector("[data-item-stock]").textContent = item.availabilityStatus === "limited" ? "Limited availability" : "Available for ordering";
-    itemForm.querySelector("[data-item-quantity]").removeAttribute("max");
+    itemForm.querySelector("[data-item-stock]").textContent = availabilityMessage(item);
+    itemForm.querySelector("[data-item-quantity]").max = String(availableQuantity(item));
     itemForm.querySelector("[data-size-options]").innerHTML = (item.sizes || [{ id: "regular", name: "Regular", priceAdjustment: 0 }]).map((size, index) => `<label class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-300 p-3 has-[:checked]:border-blue-700 has-[:checked]:bg-blue-50"><span class="flex items-center gap-3"><input type="radio" name="size" value="${escapeHtml(size.id)}" ${index === 0 ? "checked" : ""} required><span class="font-bold text-slate-800">${escapeHtml(size.name)}</span></span><span class="text-sm font-bold text-slate-600">${size.priceAdjustment ? `+${formatter.format(size.priceAdjustment)}` : "Included"}</span></label>`).join("");
     const spiceSection = itemForm.querySelector("[data-spice-section]");
     spiceSection.hidden = !(item.spiceLevels || []).length;
@@ -148,6 +165,7 @@
         if (!item || !isAvailable(item)) throw new Error("This item is no longer available.");
         const cart = ensureCart(state);
         const existingQuantity = cartQuantityForItem(cart, item.id);
+        if (existingQuantity + quantity > availableQuantity(item)) throw new Error(`Only ${availableQuantity(item)} ${item.name} available.`);
         const key = [item.id, sizeId, spiceLevel, addOnIds.join(","), instructions].join("|");
         const existing = cart.items.find((entry) => entry.key === key);
         if (existing) existing.quantity += quantity;
@@ -156,7 +174,7 @@
       }, "cart-item-added");
       global.AutoCodeApp.closeDialog(itemDialog, "added");
       renderMenu();
-      showCartFeedback("Item added to your cart.", false);
+      showCartFeedback("Item added to your order.", false);
     } catch (error) {
       const feedback = itemForm.querySelector("[data-item-feedback]");
       feedback.hidden = false;
@@ -164,11 +182,40 @@
     }
   }
 
+  function quickAddItem(itemId) {
+    try {
+      global.AutoCodeState.update((state) => {
+        const item = state.menuItems.find((candidate) => candidate.id === itemId && candidate.restaurantId === restaurantId);
+        if (!item || !isAvailable(item)) throw new Error("This item is no longer available.");
+        const sizeId = item.sizes?.[0]?.id || "regular";
+        const spiceLevel = item.spiceLevels?.[0] || "";
+        const addOnIds = [];
+        const instructions = "";
+        const cart = ensureCart(state);
+        if (cartQuantityForItem(cart, item.id) + 1 > availableQuantity(item)) throw new Error(`${item.name} is no longer available in that quantity.`);
+        const key = [item.id, sizeId, spiceLevel, "", instructions].join("|");
+        const existing = cart.items.find((entry) => entry.key === key);
+        if (existing) existing.quantity += 1;
+        else cart.items.push({ id: `cart_item_${Date.now()}`, key, itemId: item.id, quantity: 1, sizeId, spiceLevel, addOnIds, instructions, unitPrice: entryUnitPrice(item, sizeId, addOnIds), addedAt: new Date().toISOString() });
+        cart.updatedAt = new Date().toISOString();
+      }, "quick-order-item-added");
+      renderMenu();
+      showCartFeedback("Default item added. You can keep browsing or review your order.", false);
+    } catch (error) {
+      showCartFeedback(error.message, true);
+    }
+  }
+
   function showCartFeedback(message, error) {
+    global.clearTimeout(feedbackDismissTimer);
     cartFeedback.hidden = false;
     cartFeedback.textContent = message;
     cartFeedback.className = `mb-4 rounded-xl px-4 py-3 text-sm font-bold ${error ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"}`;
     if (!cartDialog.open) global.AutoCodeApp.openDialog(cartDialog);
+    if (!error) feedbackDismissTimer = global.setTimeout(() => {
+      if (cartDialog.open) global.AutoCodeApp.closeDialog(cartDialog);
+      cartFeedback.hidden = true;
+    }, 2400);
   }
 
   function cartTotals(cart, state) {
@@ -191,7 +238,7 @@
       const size = (item?.sizes || []).find((option) => option.id === entry.sizeId)?.name;
       const addOns = (item?.addOns || []).filter((option) => entry.addOnIds.includes(option.id)).map((option) => option.name);
       const details = [size, entry.spiceLevel, ...addOns].filter(Boolean).join(" · ");
-      return `<article class="border-b border-slate-200 py-5 last:border-0"><div class="flex gap-4"><div class="flex size-14 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-3xl">${escapeHtml(item?.icon || "🍽️")}</div><div class="min-w-0 flex-1"><div class="flex items-start justify-between gap-3"><div><h3 class="font-extrabold text-slate-950">${escapeHtml(item?.name || "Unavailable item")}</h3><p class="mt-1 text-xs leading-5 text-slate-500">${escapeHtml(details)}</p>${entry.instructions ? `<p class="mt-1 text-xs italic text-slate-500">“${escapeHtml(entry.instructions)}”</p>` : ""}</div><p class="whitespace-nowrap font-extrabold text-slate-900">${formatter.format(entry.unitPrice * entry.quantity)}</p></div><div class="mt-4 flex items-center justify-between"><div class="inline-flex items-center rounded-lg border border-slate-300"><button type="button" data-cart-decrease="${escapeHtml(entry.id)}" class="px-3 py-1.5 font-black" aria-label="Decrease ${escapeHtml(item?.name)}">−</button><span class="min-w-8 text-center text-sm font-bold">${entry.quantity}</span><button type="button" data-cart-increase="${escapeHtml(entry.id)}" class="px-3 py-1.5 font-black" aria-label="Increase ${escapeHtml(item?.name)}">+</button></div><button type="button" data-cart-remove="${escapeHtml(entry.id)}" class="text-sm font-bold text-red-700 hover:underline">Remove</button></div></div></div></article>`;
+      return `<article class="border-b border-slate-200 py-5 last:border-0"><div class="flex gap-4">${itemVisual(item, "size-16 shrink-0 rounded-xl object-cover")}<div class="min-w-0 flex-1"><div class="flex items-start justify-between gap-3"><div><h3 class="font-extrabold text-slate-950">${escapeHtml(item?.name || "Unavailable item")}</h3><p class="mt-1 text-xs leading-5 text-slate-500">${escapeHtml(details)}</p>${entry.instructions ? `<p class="mt-1 text-xs italic text-slate-500">“${escapeHtml(entry.instructions)}”</p>` : ""}</div><p class="whitespace-nowrap font-extrabold text-slate-900">${formatter.format(entry.unitPrice * entry.quantity)}</p></div><div class="mt-4 flex items-center justify-between"><div class="inline-flex items-center rounded-lg border border-slate-300"><button type="button" data-cart-decrease="${escapeHtml(entry.id)}" class="px-3 py-1.5 font-black" aria-label="Decrease ${escapeHtml(item?.name)}">−</button><span class="min-w-8 text-center text-sm font-bold">${entry.quantity}</span><button type="button" data-cart-increase="${escapeHtml(entry.id)}" class="px-3 py-1.5 font-black" aria-label="Increase ${escapeHtml(item?.name)}">+</button></div><button type="button" data-cart-remove="${escapeHtml(entry.id)}" class="text-sm font-bold text-red-700 hover:underline">Remove</button></div></div></div></article>`;
     }).join("");
     const totals = cartTotals(cart, state);
     document.querySelector("[data-cart-subtotal]").textContent = formatter.format(totals.subtotal);
@@ -236,12 +283,24 @@
     renderMenu();
   });
   searchInput.addEventListener("input", () => { searchTerm = searchInput.value.trim().toLowerCase(); renderMenu(); });
-  menuGrid.addEventListener("click", (event) => { const button = event.target.closest("[data-open-item]"); if (button) openItem(button.dataset.openItem); });
+  menuGrid.addEventListener("click", (event) => {
+    const customizeButton = event.target.closest("[data-open-item]");
+    const quickAddButton = event.target.closest("[data-quick-add]");
+    if (customizeButton) openItem(customizeButton.dataset.openItem);
+    if (quickAddButton) quickAddItem(quickAddButton.dataset.quickAdd);
+  });
   itemForm.addEventListener("change", updateDialogPrice);
   itemForm.addEventListener("input", updateDialogPrice);
   itemForm.addEventListener("submit", (event) => { event.preventDefault(); addSelectedItem(); });
   document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => global.AutoCodeApp.closeDialog(button.closest("dialog"))));
-  document.querySelectorAll("[data-open-cart]").forEach((button) => button.addEventListener("click", () => { cartFeedback.hidden = true; renderCart(); global.AutoCodeApp.openDialog(cartDialog); }));
+  document.querySelectorAll("[data-open-cart]").forEach((button) => button.addEventListener("click", () => {
+    global.clearTimeout(feedbackDismissTimer);
+    cartFeedback.hidden = true;
+    renderCart();
+    global.AutoCodeApp.openDialog(cartDialog);
+  }));
+  cartDialog.addEventListener("pointerdown", () => global.clearTimeout(feedbackDismissTimer));
+  cartDialog.addEventListener("keydown", () => global.clearTimeout(feedbackDismissTimer));
   cartItems.addEventListener("click", (event) => {
     const decrease = event.target.closest("[data-cart-decrease]");
     const increase = event.target.closest("[data-cart-increase]");

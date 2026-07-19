@@ -822,24 +822,26 @@ Each event records its timestamp and acting user.
 - Reopening requires a reason and creates an audit event.
 - A reopened order returns to Ready, not Preparing.
 
-#### Staff cancellation with Admin PIN
+#### Staff cancellation with a daily administrative token
 
-Staff can cancel a paid order only with Admin PIN authorization.
+Staff can cancel a paid order only with a valid daily administrative token shared by an Admin.
 
 Cancellation flow:
 
 1. Staff selects Request Cancellation.
 2. Staff chooses or enters a cancellation reason.
-3. The application displays a protected Admin PIN prompt.
-4. An authorized Admin enters the PIN without exposing it to Staff.
-5. A valid PIN permits the Staff user to confirm cancellation.
-6. An invalid PIN leaves the order unchanged and records the failed authorization attempt.
+3. The application displays a protected daily administrative token prompt.
+4. Staff enters the temporary token shared by an authorized Admin.
+5. A valid, unexpired token permits the Staff user to confirm cancellation.
+6. An invalid or expired token leaves the order unchanged and records the failed authorization attempt.
 
 Cancellation rules:
 
 - Admin users can cancel directly after confirmation and a required reason.
-- Staff users cannot bypass the Admin PIN prompt.
-- The prototype stores an encoded or hashed PIN representation rather than displaying the PIN in readable application state.
+- Staff users cannot bypass the administrative token prompt.
+- The token automatically expires at local midnight, and Admin can immediately reload it from Settings.
+- Reloading creates a new token and invalidates the previous token immediately.
+- The permanent Admin PIN remains an owner-level recovery credential and is not shared for delegated Staff actions.
 - Repeated invalid attempts are rate-limited within the prototype session.
 - Cancellation records the initiating Staff user, authorizing Admin identity, reason, time, and order state at cancellation.
 - The application creates a simulated refund state.
@@ -977,7 +979,7 @@ While active:
 - The dashboard warns when either reward item is low or unavailable.
 - The fallback is used when the primary reward is unavailable.
 - When both are unavailable, the eligible win is flagged for a manual Staff alternative.
-- Staff cannot replace or remove a paid item without Admin PIN authorization.
+- Staff cannot replace or remove a paid item without valid administrative-token authorization.
 
 #### Concurrent inventory changes
 
@@ -1157,7 +1159,7 @@ The restaurant Help view provides searchable, categorized guidance for:
 - Marking orders Ready or Delivered
 - Identifying delayed orders
 - Payment verification
-- Cancelling with Admin PIN
+- Cancelling with the daily administrative token
 - Inventory replenishment
 - Emergency cutoffs
 - Game reward handling
@@ -1181,7 +1183,7 @@ Required recoverable states include:
 - Payment record missing or not successful
 - Inventory conflict or invalid quantity
 - Reward unavailable
-- Incorrect or rate-limited Admin PIN
+- Incorrect, expired, or rate-limited administrative token
 - Import schema failure
 - Backup creation or restoration failure
 - Local Storage unavailable, full, or corrupted
@@ -1329,7 +1331,7 @@ The prototype is complete when:
 - Tic-Tac-Toe works for guests and eligible signed-in customers.
 - An eligible win issues at most one in-stock current-order reward.
 - Admin and Staff permissions are enforced in navigation and actions.
-- Staff cancellation requires valid Admin PIN authorization.
+- Staff cancellation requires valid, unexpired daily administrative-token authorization.
 - Menu, inventory, alerts, history, reports, Staff accounts, and preferences follow the approved rules.
 - JSON export, validated import, backup, restoration, purge, and reset flows behave safely.
 - Required empty, failure, conflict, and recovery states are represented.

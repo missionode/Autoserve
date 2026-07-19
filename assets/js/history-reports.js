@@ -18,6 +18,13 @@
   let historyFilters = { search: "", status: "all", type: "all", time: "session", from: "", to: "", payment: "all", reward: "all", actor: "all" };
 
   if (!cancellationDialog || !cancellationForm || !receiptDialog) return;
+  const delegatedTokenField = document.querySelector("[data-admin-pin-field]");
+  delegatedTokenField.querySelector("span").textContent = "Daily administrative token";
+  delegatedTokenField.querySelector("input").placeholder = "Enter today’s 6-digit token";
+  delegatedTokenField.querySelector("input").minLength = 6;
+  delegatedTokenField.querySelector("input").maxLength = 6;
+  const cancellationHelp = [...document.querySelectorAll('[data-route="help"] article')].find((article) => article.querySelector("h2")?.textContent.trim() === "Cancellation");
+  if (cancellationHelp) cancellationHelp.querySelector("p").textContent = "A reason is required. Staff must obtain today’s administrative token from an Admin. Tokens expire at local midnight and can be reloaded in Settings.";
 
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
   const createId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -69,19 +76,19 @@
     document.querySelector("[data-admin-pin-field]").hidden = session.role === "admin";
     cancellationForm.elements.adminPin.required = session.role === "staff";
     const lock = pinLockRemaining(state);
-    document.querySelector("[data-pin-rate-note]").textContent = lock ? `Too many invalid attempts. Try again in ${Math.ceil(lock / 1000)} seconds.` : "PIN attempts are audited and rate-limited.";
+    document.querySelector("[data-pin-rate-note]").textContent = lock ? `Too many invalid attempts. Try again in ${Math.ceil(lock / 1000)} seconds.` : "Token attempts are audited and rate-limited. Ask an Admin for today’s token.";
     document.querySelector("[data-confirm-cancellation]").disabled = lock > 0;
     global.AutoCodeApp.openDialog(cancellationDialog);
   }
 
-  function recordFailedPin(orderId, reason) {
+  function recordFailedToken(orderId, reason) {
     global.AutoCodeState.update((state) => {
       state.authorizationAttempts ||= [];
       const order = ordersFor(state).find((entry) => entry.id === orderId);
       const timestamp = now();
       state.authorizationAttempts.push({ id: createId("auth_attempt"), restaurantId, orderId, actorId: session.id, actorName: session.name, action: "order_cancellation", success: false, reason, at: timestamp });
       if (order && !terminalStatuses.includes(order.status)) order.timeline.push({ type: "cancellation_authorization_failed", label: "Cancellation authorization rejected", at: timestamp, actor: session.id, actorName: session.name });
-    }, "cancellation-pin-rejected");
+    }, "cancellation-token-rejected");
   }
 
   function restoreInventory(state, order, selectedIndexes, automatic, timestamp) {
@@ -117,16 +124,18 @@
     if (data.get("confirmed") !== "yes") { setFeedback("Confirm the cancellation and refund before continuing.", true); return; }
     const initial = global.AutoCodeState.read();
     const lock = pinLockRemaining(initial);
-    if (lock > 0) { setFeedback(`PIN authorization is rate-limited for ${Math.ceil(lock / 1000)} more seconds.`, true); return; }
+    if (lock > 0) { setFeedback(`Token authorization is rate-limited for ${Math.ceil(lock / 1000)} more seconds.`, true); return; }
 
     let authorizer = session.role === "admin" ? initial.users.find((user) => user.id === session.id) : null;
     if (session.role === "staff") {
-      const submittedHash = await sha256(String(data.get("adminPin") || ""));
-      authorizer = initial.users.find((user) => user.restaurantId === restaurantId && user.role === "admin" && user.active && user.adminPinHash === submittedHash);
+      const restaurant = initial.restaurants.find((entry) => entry.id === restaurantId);
+      const tokenExpired = new Date(restaurant?.administrativeTokenExpiresAt || 0).getTime() <= Date.now();
+      const submittedToken = String(data.get("adminPin") || "").trim();
+      authorizer = !tokenExpired && submittedToken === restaurant?.administrativeToken ? initial.users.find((user) => user.restaurantId === restaurantId && user.role === "admin" && user.active) : null;
       if (!authorizer) {
-        recordFailedPin(cancellationOrderId, "invalid_pin");
+        recordFailedToken(cancellationOrderId, tokenExpired ? "expired_administrative_token" : "invalid_administrative_token");
         const failures = recentPinFailures(global.AutoCodeState.read()).length;
-        setFeedback(failures >= MAX_PIN_FAILURES ? "Incorrect PIN. Further attempts are locked for 60 seconds." : `Incorrect Admin PIN. ${MAX_PIN_FAILURES - failures} attempt(s) remain before a temporary lock.`, true);
+        setFeedback(tokenExpired ? "Today’s administrative token has expired. Ask an Admin to open Settings or reload the token." : failures >= MAX_PIN_FAILURES ? "Incorrect token. Further attempts are locked for 60 seconds." : `Incorrect administrative token. ${MAX_PIN_FAILURES - failures} attempt(s) remain before a temporary lock.`, true);
         if (failures >= MAX_PIN_FAILURES) document.querySelector("[data-confirm-cancellation]").disabled = true;
         return;
       }
