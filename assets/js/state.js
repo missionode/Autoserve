@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "autocode.prototype.state";
-  const SCHEMA_VERSION = 9;
+  const SCHEMA_VERSION = 13;
   const listeners = new Set();
 
   const now = () => new Date().toISOString();
@@ -49,6 +49,7 @@
           slug: "autoserve-demo",
           name: "Autoserve Demo Kitchen",
           status: "open",
+          approvalStatus: "approved",
           currency: "INR",
           taxPercent: 5,
           dineInEnabled: true,
@@ -58,6 +59,10 @@
           brandLogoPath: "assets/images/branding/demo-kitchen-logo.jpg",
           complaintPhone: "+91 90000 00999",
           qrGuestMessage: "Scan to view the menu and place your order",
+          combosEnabled: true,
+          comboSectionTitle: "Popular meal combos",
+          featuredCombo: { id: "combo_signature", name: "Autoserve Signature Combo", itemIds: ["item_burger", "item_fries", "item_cold_coffee"], price: 349, active: true },
+          combos: [{ id: "combo_signature", name: "Autoserve Signature Combo", itemIds: ["item_burger", "item_fries", "item_cold_coffee"], price: 349, active: true }, { id: "combo_snack", name: "Snack & Sip", itemIds: ["item_fries", "item_cold_coffee"], price: 199, active: true }, { id: "combo_sweet", name: "Coffee & Brownie Break", itemIds: ["item_cold_coffee", "item_brownie"], price: 219, active: true }],
           administrativeToken: createAdministrativeToken(),
           administrativeTokenExpiresAt: nextLocalMidnight(),
           tokenStart: 100,
@@ -71,6 +76,16 @@
         }
       ],
       users: [
+        {
+          id: "super_admin_demo",
+          role: "super_admin",
+          name: "Demo Super Admin",
+          username: "superadmin",
+          email: "superadmin@autoserve.demo",
+          password: "SuperAdmin@123",
+          active: true,
+          createdAt
+        },
         {
           id: "customer_demo",
           role: "customer",
@@ -320,6 +335,28 @@
         state.restaurants.forEach((restaurant) => { restaurant.nextToken = Math.max(Number(restaurant.nextToken || 100), maxToken + 4); restaurant.nextKot = Math.max(Number(restaurant.nextKot || 1), maxKot + 4); });
       }
       state.schemaVersion = 9;
+    }
+    if (state.schemaVersion === 9) {
+      state.restaurants.forEach((restaurant) => {
+        restaurant.combosEnabled ??= true;
+        restaurant.comboSectionTitle ||= "Popular meal combos";
+        restaurant.featuredCombo ||= { id: "combo_signature", name: "Autoserve Signature Combo", itemIds: ["item_burger", "item_fries", "item_cold_coffee"], price: 349, active: true };
+      });
+      state.schemaVersion = 10;
+    }
+    if (state.schemaVersion === 10) {
+      state.restaurants.forEach((restaurant) => {
+        restaurant.combos ||= [restaurant.featuredCombo, { id: "combo_snack", name: "Snack & Sip", itemIds: ["item_fries", "item_cold_coffee"], price: 199, active: true }, { id: "combo_sweet", name: "Coffee & Brownie Break", itemIds: ["item_cold_coffee", "item_brownie"], price: 219, active: true }].filter(Boolean);
+      });
+      state.schemaVersion = 11;
+    }
+    if (state.schemaVersion === 11) {
+      if (!state.users.some((user) => user.role === "super_admin")) state.users.unshift({ id: "super_admin_demo", role: "super_admin", name: "Demo Super Admin", username: "superadmin", email: "superadmin@autoserve.demo", password: "SuperAdmin@123", active: true, createdAt: now() });
+      state.schemaVersion = 12;
+    }
+    if (state.schemaVersion === 12) {
+      state.restaurants.forEach((restaurant) => { restaurant.approvalStatus ||= restaurant.id === "rest_autoserve_demo" ? "approved" : "pending"; if (restaurant.approvalStatus === "approved") restaurant.approvedAt ||= now(); });
+      state.schemaVersion = 13;
     }
     if (state.schemaVersion < SCHEMA_VERSION) throw new Error("No migration is available for this prototype data.");
     return state;

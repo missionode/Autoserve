@@ -69,7 +69,7 @@
         const state = stateApi.read();
         const guestSession = state.activeSession;
         const user = state.users.find((candidate) => {
-          const matchesIdentifier = normalized(candidate.email) === identifier || normalized(candidate.staffId) === identifier || normalized(candidate.mobile) === identifier;
+          const matchesIdentifier = normalized(candidate.username) === identifier || normalized(candidate.email) === identifier || normalized(candidate.staffId) === identifier || normalized(candidate.mobile) === identifier;
           return matchesIdentifier && candidate.password === password;
         });
 
@@ -80,6 +80,13 @@
         if (!user.active) {
           setFeedback("This account is inactive. Contact the restaurant administrator.", "error");
           return;
+        }
+        if (["admin", "staff"].includes(user.role)) {
+          const restaurant = state.restaurants.find((entry) => entry.id === user.restaurantId);
+          if (restaurant?.approvalStatus !== "approved") {
+            setFeedback(restaurant?.approvalStatus === "rejected" ? `This restaurant application was rejected${restaurant.rejectionReason ? `: ${restaurant.rejectionReason}` : "."}` : "This restaurant is awaiting Super Admin approval. You can sign in after approval.", "error");
+            return;
+          }
         }
 
         const session = {
@@ -151,6 +158,33 @@
     });
   }
 
+  async function sha256(value) { const digest = await global.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
+
+  function handleRestaurantSignup(form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(form); const value = (name) => String(data.get(name) || "").trim(); const adminEmail = normalized(value("adminEmail")); const contactEmail = normalized(value("contactEmail")); const password = value("password"); const adminPin = value("adminPin");
+      const required = ["legalName", "restaurantName", "gstin", "fssaiNumber", "fssaiExpiry", "tradeLicense", "tradeLicenseExpiry", "pan", "address", "city", "stateName", "postalCode", "contactPhone", "contactEmail", "complaintPhone", "adminName", "adminEmail"];
+      if (required.some((name) => !value(name)) || !/^\S+@\S+\.\S+$/.test(adminEmail) || !/^\S+@\S+\.\S+$/.test(contactEmail) || !/^[0-9A-Z]{15}$/.test(value("gstin").toUpperCase()) || !/^\d{14}$/.test(value("fssaiNumber")) || !/^[A-Z]{5}\d{4}[A-Z]$/.test(value("pan").toUpperCase()) || !/^\d{6}$/.test(value("postalCode")) || password.length < 8 || !/^\d{4,8}$/.test(adminPin) || data.get("terms") !== "accepted") return setFeedback("Complete all required business, licence, contact, and Admin fields using valid formats.", "error");
+      if (new Date(value("fssaiExpiry")) <= new Date() || new Date(value("tradeLicenseExpiry")) <= new Date()) return setFeedback("FSSAI and trade licences must have future expiry dates.", "error");
+      try {
+        const current = stateApi.read();
+        if (current.users.some((user) => normalized(user.email) === adminEmail) || current.restaurants.some((restaurant) => normalized(restaurant.contactEmail) === contactEmail || normalized(restaurant.licenses?.gstin) === normalized(value("gstin")))) return setFeedback("That Admin email, restaurant email, or GSTIN is already registered.", "error");
+        const stamp = Date.now(); const restaurantId = `rest_${stamp}`; const adminId = `admin_${stamp}`; const slugBase = value("restaurantName").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `restaurant-${stamp}`; const expires = new Date(); expires.setHours(24, 0, 0, 0); const pinHash = await sha256(adminPin);
+        stateApi.update((state) => {
+          const demo = state.restaurants.find((restaurant) => restaurant.id === "rest_autoserve_demo");
+          const categoryMap = new Map(); state.categories.filter((category) => category.restaurantId === "rest_autoserve_demo").forEach((category, index) => { const id = `${restaurantId}_cat_${index + 1}`; categoryMap.set(category.id, id); state.categories.push({ ...category, id, restaurantId }); });
+          const itemMap = new Map(); state.menuItems.filter((item) => item.restaurantId === "rest_autoserve_demo").forEach((item, index) => { const id = `${restaurantId}_item_${index + 1}`; itemMap.set(item.id, id); state.menuItems.push({ ...JSON.parse(JSON.stringify(item)), id, restaurantId, categoryId: categoryMap.get(item.categoryId), stock: 0, availableQuantity: 0, availabilityStatus: "unavailable", availabilityNote: "Set opening availability before publishing", updatedAt: new Date().toISOString() }); });
+          state.restaurants.push({ id: restaurantId, slug: state.restaurants.some((restaurant) => restaurant.slug === slugBase) ? `${slugBase}-${stamp}` : slugBase, name: value("restaurantName"), legalName: value("legalName"), businessType: value("businessType"), status: "closed", currency: "INR", taxPercent: Number(value("taxPercent")), contactPhone: value("contactPhone"), contactEmail, complaintPhone: value("complaintPhone"), address: value("address"), city: value("city"), state: value("stateName"), postalCode: value("postalCode"), operatingHours: value("operatingHours"), dineInEnabled: data.get("dineInEnabled") === "on", takeawayEnabled: data.get("takeawayEnabled") === "on", dineInServiceMode: value("dineInServiceMode"), tableNumbers: [...new Set(value("tableNumbers").split(",").map((entry) => entry.trim().toUpperCase()).filter(Boolean))], licenses: { gstin: value("gstin").toUpperCase(), fssaiNumber: value("fssaiNumber"), fssaiExpiry: value("fssaiExpiry"), tradeLicense: value("tradeLicense"), tradeLicenseExpiry: value("tradeLicenseExpiry"), pan: value("pan").toUpperCase(), localRegistration: value("localRegistration"), verificationStatus: "prototype_unverified" }, administrativeToken: String(Math.floor(100000 + Math.random() * 900000)), administrativeTokenExpiresAt: expires.toISOString(), tokenStart: 100, nextToken: 100, nextKot: 1, defaultPreparationMinutes: 10, warningMinutes: 8, delayedMinutes: 15, lowStockDefault: 5, primaryRewardItemId: itemMap.get(demo?.primaryRewardItemId), fallbackRewardItemId: itemMap.get(demo?.fallbackRewardItemId), brandLogoPath: "assets/images/branding/demo-kitchen-logo.jpg", qrGuestMessage: "Scan to view the menu and place your order", combosEnabled: false, comboSectionTitle: "Popular meal combos", combos: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+          const createdRestaurant = state.restaurants.find((restaurant) => restaurant.id === restaurantId); createdRestaurant.approvalStatus = "pending"; createdRestaurant.approvalSubmittedAt = new Date().toISOString();
+          state.users.push({ id: adminId, restaurantId, role: "admin", name: value("adminName"), email: adminEmail, password, adminPinHash: pinHash, active: true, createdAt: new Date().toISOString() });
+          state.activeSession = null;
+        }, "restaurant-company-created");
+        setFeedback("Application submitted. A Super Admin must approve the restaurant before sign-in.", "success"); global.setTimeout(() => global.location.assign("./login.html?reason=pending-approval"), 700);
+      } catch (error) { setFeedback(error.message || "The restaurant account could not be created.", "error"); }
+    });
+  }
+
   document.querySelectorAll("[data-guest-entry]").forEach((button) => button.addEventListener("click", continueAsGuest));
   const returnTo = new URLSearchParams(global.location.search).get("returnTo");
   if (returnTo) document.querySelectorAll('a[href*="signup.html"]').forEach((link) => { const target = new URL(link.href); target.searchParams.set("returnTo", returnTo); link.href = target.href; });
@@ -166,5 +200,6 @@
   if (!form) return;
   if (page === "login") handleLogin(form);
   if (page === "signup") handleSignup(form);
+  if (page === "restaurant-signup") handleRestaurantSignup(form);
   if (page === "forgot-password") handleRecovery(form);
 })(window);

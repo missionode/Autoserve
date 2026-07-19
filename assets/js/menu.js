@@ -9,6 +9,7 @@
   const categoryList = document.querySelector("[data-category-list]");
   const searchInput = document.querySelector("[data-menu-search]");
   const emptyState = document.querySelector("[data-menu-empty]");
+  const comboSection = document.querySelector("[data-combo-section]");
   const itemDialog = document.querySelector("#item-dialog");
   const cartDialog = document.querySelector("#cart-dialog");
   const itemForm = document.querySelector("[data-item-form]");
@@ -20,6 +21,9 @@
   let searchTerm = "";
   let selectedItemId = null;
   let feedbackDismissTimer = 0;
+  let comboIndex = 0;
+  let comboAutoplay = true;
+  let comboAutoplayTimer = 0;
 
   if (!menuGrid || !itemDialog || !cartDialog) return;
 
@@ -75,11 +79,21 @@
     }).join("");
   }
 
+  function renderCombo(restaurant, items) {
+    const combos = (restaurant?.combos || []).filter((combo) => combo.active && combo.itemIds?.length >= 2); comboIndex = combos.length ? comboIndex % combos.length : 0; const combo = combos[comboIndex]; const comboItems = (combo?.itemIds || []).map((id) => items.find((item) => item.id === id)).filter(Boolean); const available = restaurant?.status === "open" && comboItems.length >= 2 && comboItems.every(isAvailable);
+    comboSection.hidden = !(restaurant?.combosEnabled && combo && comboItems.length >= 2);
+    if (comboSection.hidden) { comboSection.innerHTML = ""; return; }
+    const normalPrice = comboItems.reduce((sum, item) => sum + item.price + Number(item.sizes?.[0]?.priceAdjustment || 0), 0);
+    comboSection.innerHTML = `<div class="overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl" role="region" aria-roledescription="carousel" aria-label="${escapeHtml(restaurant.comboSectionTitle || "Popular meal combos")}"><div class="grid lg:grid-cols-[0.42fr_0.58fr]"><div class="grid grid-cols-3 bg-slate-800">${comboItems.slice(0, 3).map((item) => itemVisual(item, "aspect-square h-full w-full object-cover")).join("")}</div><div class="p-6 sm:p-8"><div class="flex items-center justify-between gap-3"><p class="text-xs font-extrabold uppercase tracking-[0.16em] text-blue-300">${escapeHtml(restaurant.comboSectionTitle || "Popular meal combos")}</p><span class="text-xs text-slate-400">${comboIndex + 1} / ${combos.length}</span></div><h2 class="mt-2 text-3xl font-black">${escapeHtml(combo.name)}</h2><p class="mt-3 text-sm leading-6 text-slate-300">${comboItems.map((item) => escapeHtml(item.name)).join(" · ")}</p><div class="mt-5 flex flex-wrap items-center justify-between gap-4"><div><strong class="text-3xl font-black">${formatter.format(combo.price)}</strong>${normalPrice > combo.price ? `<span class="ml-2 text-sm text-slate-400 line-through">${formatter.format(normalPrice)}</span>` : ""}</div><button data-add-combo="${escapeHtml(combo.id)}" ${available ? "" : "disabled"} class="rounded-xl px-5 py-3 font-extrabold ${available ? "bg-blue-600 text-white hover:bg-blue-500" : "cursor-not-allowed bg-slate-700 text-slate-400"}">${available ? "Add combo" : "Combo unavailable"}</button></div><div class="mt-5 flex items-center justify-between gap-3"><button data-combo-prev type="button" class="rounded-full border border-slate-600 px-3 py-2" aria-label="Previous combo">←</button><div class="flex gap-1.5" aria-hidden="true">${combos.map((_, index) => `<span class="size-2 rounded-full ${index === comboIndex ? "bg-blue-400" : "bg-slate-600"}"></span>`).join("")}</div><button data-combo-next type="button" class="rounded-full border border-slate-600 px-3 py-2" aria-label="Next combo">→</button></div></div></div></div>`;
+    if (comboAutoplay && !comboAutoplayTimer && !global.matchMedia("(prefers-reduced-motion: reduce)").matches && combos.length > 1) comboAutoplayTimer = global.setInterval(() => { comboIndex = (comboIndex + 1) % combos.length; const context = readContext(); renderCombo(context.restaurant, context.items); }, 5000);
+  }
+
   function renderMenu() {
     try {
       const { state, restaurant, categories, items } = readContext();
       const cart = currentCart(state);
       renderCategories(categories);
+      renderCombo(restaurant, items);
       if (restaurant?.status !== "open") {
         emptyState.hidden = true;
         menuGrid.innerHTML = '<div class="app-card col-span-full border-amber-200 p-10 text-center"><div class="text-5xl">🕒</div><h2 class="mt-4 text-2xl font-black text-slate-950">Restaurant currently closed</h2><p class="mt-2 text-slate-600">Your order is retained. Return during operating hours to review availability and checkout.</p></div>';
@@ -206,6 +220,21 @@
     }
   }
 
+  function addCombo(comboId) {
+    try {
+      global.AutoCodeState.update((state) => {
+        const restaurant = state.restaurants.find((entry) => entry.id === restaurantId); const combo = (restaurant?.combos || []).find((entry) => entry.id === comboId);
+        if (!restaurant?.combosEnabled || !combo?.active || combo.id !== comboId) throw new Error("This combo is no longer available.");
+        const items = combo.itemIds.map((id) => state.menuItems.find((item) => item.id === id && item.restaurantId === restaurantId));
+        if (items.length < 2 || items.some((item) => !item || !isAvailable(item) || cartQuantityForItem(currentCart(state), item.id) + 1 > availableQuantity(item))) throw new Error("One or more combo items are unavailable.");
+        const regularPrices = items.map((item) => entryUnitPrice(item, item.sizes?.[0]?.id || "regular", [])); const regularTotal = regularPrices.reduce((sum, price) => sum + price, 0); const instance = `combo_${Date.now()}`; const cart = ensureCart(state); let allocated = 0;
+        items.forEach((item, index) => { const sizeId = item.sizes?.[0]?.id || "regular"; const unitPrice = index === items.length - 1 ? Number(combo.price) - allocated : Math.round(Number(combo.price) * regularPrices[index] / regularTotal * 100) / 100; allocated += unitPrice; cart.items.push({ id: `cart_item_${Date.now()}_${index}`, key: `${instance}|${item.id}`, itemId: item.id, quantity: 1, sizeId, spiceLevel: item.spiceLevels?.[0] || "", addOnIds: [], instructions: "", unitPrice, regularUnitPrice: regularPrices[index], comboId: combo.id, comboName: combo.name, comboInstance: instance, addedAt: new Date().toISOString() }); });
+        cart.updatedAt = new Date().toISOString();
+      }, "featured-combo-added");
+      renderMenu(); showCartFeedback("Combo added to your order.", false);
+    } catch (error) { showCartFeedback(error.message, true); }
+  }
+
   function showCartFeedback(message, error) {
     global.clearTimeout(feedbackDismissTimer);
     cartFeedback.hidden = false;
@@ -289,6 +318,8 @@
     if (customizeButton) openItem(customizeButton.dataset.openItem);
     if (quickAddButton) quickAddItem(quickAddButton.dataset.quickAdd);
   });
+  comboSection.addEventListener("click", (event) => { const button = event.target.closest("button"); if (!button) return; if (button.dataset.addCombo) addCombo(button.dataset.addCombo); if (button.matches("[data-combo-prev], [data-combo-next]")) { comboAutoplay = false; global.clearInterval(comboAutoplayTimer); comboAutoplayTimer = 0; const combos = (readContext().restaurant?.combos || []).filter((combo) => combo.active); comboIndex = (comboIndex + (button.matches("[data-combo-next]") ? 1 : -1) + combos.length) % combos.length; renderMenu(); } });
+  comboSection.addEventListener("pointerenter", () => { if (comboAutoplay) { comboAutoplay = false; global.clearInterval(comboAutoplayTimer); comboAutoplayTimer = 0; renderMenu(); } }, { once: true });
   itemForm.addEventListener("change", updateDialogPrice);
   itemForm.addEventListener("input", updateDialogPrice);
   itemForm.addEventListener("submit", (event) => { event.preventDefault(); addSelectedItem(); });

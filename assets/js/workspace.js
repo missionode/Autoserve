@@ -5,6 +5,10 @@
   const allowedRoles = workspace === "customer" ? ["customer", "guest"] : ["admin", "staff"];
   const session = global.AutoCodeApp.requireRole(allowedRoles);
   if (!session) return;
+  if (workspace === "restaurant") {
+    const restaurant = global.AutoCodeState.read().restaurants.find((entry) => entry.id === session.restaurantId);
+    if (restaurant?.approvalStatus !== "approved") { global.AutoCodeApp.setSession(null); global.location.replace("../login.html?reason=pending-approval"); return; }
+  }
   if (global.AutoCodeEntryError) {
     global.AutoCodeApp.showState("error", global.AutoCodeEntryError);
     return;

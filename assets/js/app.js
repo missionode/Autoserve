@@ -5,12 +5,13 @@
     customer: "customers/",
     guest: "customers/",
     admin: "restaurants/",
-    staff: "restaurants/"
+    staff: "restaurants/",
+    super_admin: "super_admin/"
   };
 
   function rootPath(pathname) {
     const path = global.location.pathname;
-    const nested = /\/(customers|restaurants)\//.test(path);
+    const nested = /\/(customers|restaurants|super_admin)\//.test(path);
     return `${nested ? "../" : "./"}${pathname || ""}`;
   }
 
@@ -127,7 +128,7 @@
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.8 2.1c-1 .6-1.5 1.1-1.5 2.4M12 17h.01"/>'
   };
 
-  const navigationIcons = { home: "home", menu: "menu", orders: "orders", game: "play", profile: "user", help: "help", dashboard: "dashboard", inventory: "inventory", history: "history", reports: "reports", admin: "menu", settings: "settings", data: "database", qr: "qr" };
+  const navigationIcons = { home: "home", menu: "menu", orders: "orders", game: "play", profile: "user", help: "help", dashboard: "dashboard", restaurants: "home", users: "user", activity: "history", inventory: "inventory", history: "history", reports: "reports", admin: "menu", settings: "settings", data: "database", qr: "qr" };
 
   function enhanceMobileNavigation(root) {
     const links = [];

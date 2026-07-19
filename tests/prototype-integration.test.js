@@ -10,6 +10,8 @@ const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const customerHtml = read("customers/index.html");
 const restaurantHtml = read("restaurants/index.html");
+const loginHtml = read("login.html");
+const restaurantSignupHtml = read("restaurant-signup.html");
 const themeCss = read("assets/css/theme.css");
 const scripts = Object.fromEntries(fs.readdirSync(path.join(root, "assets/js")).filter((name) => name.endsWith(".js")).map((name) => [name, read(`assets/js/${name}`)]));
 
@@ -39,6 +41,56 @@ test("all referenced local scripts exist and parse", () => {
     }
   }
   for (const [name, source] of Object.entries(scripts)) assert.doesNotThrow(() => new vm.Script(source, { filename: name }));
+});
+
+test("login separates customer and restaurant registration paths", () => {
+  assert.match(loginHtml, /Sign in to your workspace[\s\S]*Create customer account/);
+  assert.match(loginHtml, /Are you a restaurant\?/);
+  assert.match(loginHtml, /href="\.\/restaurant-signup\.html"/);
+  assert.match(restaurantSignupHtml, /Restaurant company onboarding/);
+  for (const field of ["legalName", "restaurantName", "businessType", "gstin", "fssaiNumber", "fssaiExpiry", "tradeLicense", "tradeLicenseExpiry", "pan", "address", "contactPhone", "complaintPhone", "dineInServiceMode", "adminName", "adminEmail", "adminPin"]) assert.match(restaurantSignupHtml, new RegExp(`name="${field}"`));
+  assert.match(scripts["auth.js"], /function handleRestaurantSignup/);
+  assert.match(scripts["auth.js"], /restaurant-company-created/);
+  assert.match(scripts["auth.js"], /verificationStatus: "prototype_unverified"/);
+  assert.match(scripts["auth.js"], /page === "restaurant-signup"/);
+});
+
+test("Super Admin login routes to a platform-wide user and restaurant dashboard", () => {
+  const superAdminHtml = read("super_admin/index.html");
+  assert.match(loginHtml, /Super Admin:<\/strong> superadmin \/ SuperAdmin@123/);
+  assert.match(scripts["state.js"], /username: "superadmin"/);
+  assert.match(scripts["state.js"], /role: "super_admin"/);
+  assert.match(scripts["app.js"], /super_admin: "super_admin\/"/);
+  assert.match(scripts["auth.js"], /normalized\(candidate\.username\) === identifier/);
+  assert.match(superAdminHtml, /Super Admin<\/h1>/);
+  assert.match(superAdminHtml, /data-open-create-user/);
+  assert.match(superAdminHtml, /data-platform-restaurants/);
+  assert.match(superAdminHtml, /data-platform-users/);
+  assert.match(scripts["super-admin.js"], /requireRole\(\["super_admin"\]\)/);
+  assert.match(scripts["super-admin.js"], /super-admin-user-created/);
+  assert.match(scripts["super-admin.js"], /restaurant_admin_impersonation/);
+});
+
+test("new restaurants require Super Admin licence approval before operations", () => {
+  assert.match(scripts["auth.js"], /approvalStatus = "pending"/);
+  assert.match(scripts["auth.js"], /awaiting Super Admin approval/);
+  assert.match(scripts["auth.js"], /reason=pending-approval/);
+  assert.match(scripts["workspace.js"], /restaurant\?\.approvalStatus !== "approved"/);
+  assert.match(scripts["super-admin.js"], /data-approve-restaurant/);
+  assert.match(scripts["super-admin.js"], /data-reject-restaurant/);
+  assert.match(scripts["super-admin.js"], /restaurant_approved/);
+  assert.match(scripts["super-admin.js"], /restaurant_rejected/);
+  assert.match(scripts["super-admin.js"], /prototype_approved/);
+});
+
+test("Super Admin exposes scalable header pages for registered restaurants", () => {
+  const html = read("super_admin/index.html");
+  for (const route of ["dashboard", "restaurants", "users", "activity"]) { assert.match(html, new RegExp(`data-route-link="${route}"`)); assert.match(html, new RegExp(`data-route="${route}"`)); }
+  assert.match(html, /data-super-mobile-nav/);
+  assert.match(html, /Search name, company or email/);
+  assert.match(scripts["super-admin.js"], /initHashRoutes\("dashboard"\)/);
+  assert.match(scripts["super-admin.js"], /closeMobileNavigation/);
+  assert.match(scripts["app.js"], /restaurants: "home"/);
 });
 
 test("Admin-only routes and mutation controllers are role gated", () => {
@@ -174,7 +226,7 @@ test("checkout respects restaurant fulfillment preferences", () => {
 });
 
 test("staff delegated actions use a reloadable daily administrative token", () => {
-  assert.match(scripts["state.js"], /SCHEMA_VERSION = 9/);
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 13/);
   assert.match(scripts["state.js"], /administrativeToken: createAdministrativeToken\(\)/);
   assert.match(scripts["state.js"], /administrativeTokenExpiresAt: nextLocalMidnight\(\)/);
   assert.match(scripts["admin-settings.js"], /Daily administrative token/);
@@ -261,7 +313,7 @@ test("every mobile workspace destination receives a corresponding menu icon", ()
 });
 
 test("demo state includes coherent order, payment, reward, and cancellation history", () => {
-  assert.match(scripts["state.js"], /SCHEMA_VERSION = 9/);
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 13/);
   assert.match(scripts["state.js"], /function sampleHistory\(\)/);
   for (const sample of ["order_sample_100", "order_sample_101", "order_sample_102", "payment_sample_100", "auth_sample_102", "game_sample_100"]) assert.match(scripts["state.js"], new RegExp(sample));
   assert.match(scripts["state.js"], /status: "delivered"/);
@@ -352,4 +404,26 @@ test("post-payment game shows an order-based countdown and simulates meal readin
   assert.match(scripts["tracking-game.js"], /order_received.*preparing.*ready/s);
   assert.match(scripts["tracking-game.js"], /demo-meal-preparation-progressed/);
   assert.match(scripts["tracking-game.js"], /setInterval\(\(\) => \{ simulatePreparation\(\); renderTracking\(\); \}, 1000\)/);
+});
+
+test("digital menu presents an Admin-configurable featured combo for guests and customers", () => {
+  assert.match(customerHtml, /data-combo-section/);
+  assert.match(scripts["state.js"], /comboSectionTitle: "Popular meal combos"/);
+  assert.match(scripts["state.js"], /combos: \[\{ id: "combo_signature"/);
+  assert.match(scripts["admin-settings.js"], /Digital-menu combo manager/);
+  assert.match(scripts["admin-settings.js"], /data-combo-item-search/);
+  assert.match(scripts["admin-settings.js"], /data-combo-item-chips/);
+  assert.match(scripts["admin-settings.js"], /combo-created/);
+  assert.match(scripts["menu.js"], /function renderCombo/);
+  assert.match(scripts["menu.js"], /function addCombo/);
+  assert.match(scripts["menu.js"], /featured-combo-added/);
+  assert.match(scripts["checkout.js"], /const comboGroups = new Map\(\)/);
+  assert.match(scripts["checkout.js"], /combo\.itemIds\.includes\(item\.id\)/);
+  assert.match(scripts["menu.js"], /aria-roledescription="carousel"/);
+  assert.match(scripts["menu.js"], /data-combo-prev/);
+  assert.match(scripts["menu.js"], /data-combo-next/);
+  assert.doesNotMatch(scripts["menu.js"], /data-combo-toggle/);
+  assert.doesNotMatch(scripts["menu.js"], />Play<|>Pause</);
+  assert.match(scripts["menu.js"], /setInterval[\s\S]*5000/);
+  assert.match(scripts["menu.js"], /pointerenter/);
 });

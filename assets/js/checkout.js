@@ -57,8 +57,14 @@
       const addOns = (item?.addOns || []).filter((option) => entry.addOnIds.includes(option.id));
       if (!size || addOns.length !== entry.addOnIds.length) throw new Error(`${item?.name || "An item"} has updated options. Remove it and customize it again.`);
       const currentUnitPrice = item.price + Number(size.priceAdjustment || 0) + addOns.reduce((sum, option) => sum + Number(option.price || 0), 0);
-      if (currentUnitPrice !== entry.unitPrice) throw new Error(`${item.name} now costs ${formatter.format(currentUnitPrice)} with your selections. Remove it and add it again to accept the new price.`);
+      if (entry.comboId) {
+        const combo = (restaurant.combos || []).find((candidate) => candidate.id === entry.comboId);
+        if (!restaurant.combosEnabled || !combo?.active || combo.id !== entry.comboId || !combo.itemIds.includes(item.id) || currentUnitPrice !== entry.regularUnitPrice) throw new Error(`${entry.comboName || "The combo"} has changed. Remove its items and add the combo again.`);
+      } else if (currentUnitPrice !== entry.unitPrice) throw new Error(`${item.name} now costs ${formatter.format(currentUnitPrice)} with your selections. Remove it and add it again to accept the new price.`);
     });
+    const comboGroups = new Map();
+    cart.items.filter((entry) => entry.comboInstance).forEach((entry) => { const group = comboGroups.get(entry.comboInstance) || []; group.push(entry); comboGroups.set(entry.comboInstance, group); });
+    comboGroups.forEach((entries) => { const combo = (restaurant.combos || []).find((entry) => entry.id === entries[0]?.comboId); const itemIds = entries.map((entry) => entry.itemId).sort(); const expectedIds = [...(combo?.itemIds || [])].sort(); const total = entries.reduce((sum, entry) => sum + entry.unitPrice * entry.quantity, 0); if (!combo || itemIds.join("|") !== expectedIds.join("|") || entries.some((entry) => entry.quantity !== 1) || Math.abs(total - Number(combo.price)) > 0.01) throw new Error(`${entries[0]?.comboName || "The combo"} is incomplete. Remove its remaining items and add it again.`); });
     requested.forEach((quantity, itemId) => {
       const item = state.menuItems.find((candidate) => candidate.id === itemId && candidate.restaurantId === restaurantId);
       if (!item || item.status !== "published" || item.emergencyCutoff || ["unavailable", "sold-out", "cutoff"].includes(item.availabilityStatus)) throw new Error(`${item?.name || "An item"} is no longer available.`);
