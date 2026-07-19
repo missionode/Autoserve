@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "autocode.prototype.state";
-  const SCHEMA_VERSION = 13;
+  const SCHEMA_VERSION = 15;
   const listeners = new Set();
 
   const now = () => new Date().toISOString();
@@ -31,6 +31,15 @@
       { id: "payment_sample_102", attemptId: "attempt_sample_102", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", orderId: "order_sample_102", amount: 124.95, method: "upi-id", upiId: "demo@upi", status: "refunded", transactionId: "SIM-UPI-102", refundId: "refund_sample_102", refundedAt: at(42), createdAt: at(48), updatedAt: at(42) }
     ];
     return { orders, payments, authorizationAttempts: [{ id: "auth_sample_102", restaurantId: "rest_autoserve_demo", orderId: "order_sample_102", actorId: "staff_demo", actorName: "Demo Staff", authorizerId: "admin_demo", authorizerName: "Demo Admin", action: "order_cancellation", success: true, reason: "item_unavailable", at: at(42) }], gameAttempts: [{ id: "game_sample_100", restaurantId: "rest_autoserve_demo", customerId: "customer_demo", orderId: "order_sample_100", rewardEligible: true, result: "win", rewardStatus: "issued", rewardItemId: "item_cold_coffee", board: ["X", "O", "", "X", "O", "", "X", "", ""], createdAt: at(155), completedAt: at(152), updatedAt: at(152) }] };
+  }
+
+  function sampleSupportTickets() {
+    const at = (minutesAgo) => new Date(Date.now() - minutesAgo * 60000).toISOString();
+    return [
+      { id: "support_ticket_sample_100", reference: "SUP-100001", requesterId: "customer_demo", requesterName: "Demo Customer", requesterRole: "customer", restaurantId: "rest_autoserve_demo", category: "payment", priority: "high", subject: "Payment succeeded but order token was delayed", description: "My UPI payment completed, but the order token took several minutes to appear.", contact: "customer@autoserve.demo", status: "open", createdAt: at(24), updatedAt: at(24), messages: [{ id: "support_message_sample_100", authorId: "customer_demo", authorName: "Demo Customer", authorRole: "customer", body: "My UPI payment completed, but the order token took several minutes to appear.", at: at(24) }], timeline: [{ type: "created", label: "Support request created", actorId: "customer_demo", actorName: "Demo Customer", at: at(24) }] },
+      { id: "support_ticket_sample_101", reference: "SUP-100002", requesterId: "staff_demo", requesterName: "Demo Staff", requesterRole: "staff", restaurantId: "rest_autoserve_demo", category: "restaurant", priority: "urgent", subject: "Ready-order screen is not refreshing", description: "The kitchen marked an order Ready, but the collection counter still shows Preparing.", contact: "staff@autoserve.demo", status: "in_progress", assignedTo: "support_demo", assignedToName: "Demo Support", createdAt: at(72), updatedAt: at(48), lastRespondedAt: at(48), messages: [{ id: "support_message_sample_101a", authorId: "staff_demo", authorName: "Demo Staff", authorRole: "staff", body: "The kitchen marked an order Ready, but the collection counter still shows Preparing.", at: at(72) }, { id: "support_message_sample_101b", authorId: "support_demo", authorName: "Demo Support", authorRole: "support", body: "We are checking the cross-tab refresh. Please keep the affected token available while we investigate.", at: at(48) }], timeline: [{ type: "created", label: "Support request created", actorId: "staff_demo", actorName: "Demo Staff", at: at(72) }] },
+      { id: "support_ticket_sample_102", reference: "SUP-100003", requesterId: "admin_demo", requesterName: "Demo Admin", requesterRole: "admin", restaurantId: "rest_autoserve_demo", category: "settings", priority: "normal", subject: "Update complaint contact on QR cards", description: "Please confirm where the complaint number used on printable QR cards can be changed.", contact: "admin@autoserve.demo", status: "resolved", assignedTo: "support_demo", assignedToName: "Demo Support", resolvedAt: at(190), createdAt: at(260), updatedAt: at(190), messages: [{ id: "support_message_sample_102a", authorId: "admin_demo", authorName: "Demo Admin", authorRole: "admin", body: "Please confirm where the complaint number used on printable QR cards can be changed.", at: at(260) }, { id: "support_message_sample_102b", authorId: "support_demo", authorName: "Demo Support", authorRole: "support", body: "Open Settings → Restaurant profile, update Complaint contact number, then regenerate the QR preview.", at: at(190) }], timeline: [{ type: "created", label: "Support request created", actorId: "admin_demo", actorName: "Demo Admin", at: at(260) }] }
+    ];
   }
 
   function seedState() {
@@ -76,6 +85,16 @@
         }
       ],
       users: [
+        {
+          id: "support_demo",
+          role: "support",
+          name: "Demo Support",
+          username: "support",
+          email: "support@autoserve.demo",
+          password: "Support@123",
+          active: true,
+          createdAt
+        },
         {
           id: "super_admin_demo",
           role: "super_admin",
@@ -240,7 +259,8 @@
       gameAttempts: samples.gameAttempts,
       authorizationAttempts: samples.authorizationAttempts,
       backups: [],
-      alerts: []
+      alerts: [],
+      supportTickets: sampleSupportTickets()
     };
   }
 
@@ -357,6 +377,16 @@
     if (state.schemaVersion === 12) {
       state.restaurants.forEach((restaurant) => { restaurant.approvalStatus ||= restaurant.id === "rest_autoserve_demo" ? "approved" : "pending"; if (restaurant.approvalStatus === "approved") restaurant.approvedAt ||= now(); });
       state.schemaVersion = 13;
+    }
+    if (state.schemaVersion === 13) {
+      if (!state.users.some((user) => user.role === "support")) state.users.unshift({ id: "support_demo", role: "support", name: "Demo Support", username: "support", email: "support@autoserve.demo", password: "Support@123", active: true, createdAt: now() });
+      state.supportTickets ||= [];
+      state.schemaVersion = 14;
+    }
+    if (state.schemaVersion === 14) {
+      state.supportTickets ||= [];
+      if (!state.supportTickets.length) state.supportTickets.push(...sampleSupportTickets());
+      state.schemaVersion = 15;
     }
     if (state.schemaVersion < SCHEMA_VERSION) throw new Error("No migration is available for this prototype data.");
     return state;

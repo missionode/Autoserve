@@ -6,12 +6,13 @@
     guest: "customers/",
     admin: "restaurants/",
     staff: "restaurants/",
-    super_admin: "super_admin/"
+    super_admin: "super_admin/",
+    support: "support/"
   };
 
   function rootPath(pathname) {
     const path = global.location.pathname;
-    const nested = /\/(customers|restaurants|super_admin)\//.test(path);
+    const nested = /\/(customers|restaurants|super_admin|support)\//.test(path);
     return `${nested ? "../" : "./"}${pathname || ""}`;
   }
 

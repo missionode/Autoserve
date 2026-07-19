@@ -71,6 +71,32 @@ test("Super Admin login routes to a platform-wide user and restaurant dashboard"
   assert.match(scripts["super-admin.js"], /restaurant_admin_impersonation/);
 });
 
+test("Support account receives Help requests from every workspace", () => {
+  const supportHtml = read("support/index.html");
+  const superAdminHtml = read("super_admin/index.html");
+  assert.match(loginHtml, /Support:<\/strong> support \/ Support@123/);
+  assert.match(scripts["state.js"], /role: "support"/);
+  assert.match(scripts["state.js"], /supportTickets: sampleSupportTickets\(\)/);
+  assert.match(scripts["app.js"], /support: "support\/"/);
+  for (const html of [customerHtml, restaurantHtml, superAdminHtml]) {
+    assert.match(html, /data-route="help"/);
+    assert.match(html, /support-forms\.js/);
+  }
+  assert.match(scripts["support-forms.js"], /support-ticket-created/);
+  assert.match(scripts["support-forms.js"], /requesterRole: session\.role/);
+  assert.match(supportHtml, /data-support-ticket-list/);
+  assert.match(supportHtml, /data-support-reply-form/);
+  for (const route of ["dashboard", "requests", "activity"]) {
+    assert.match(supportHtml, new RegExp(`data-route-link="${route}"`));
+    assert.match(supportHtml, new RegExp(`data-route="${route}"`));
+  }
+  assert.match(supportHtml, /data-support-mobile-menu/);
+  for (const sample of ["support_ticket_sample_100", "support_ticket_sample_101", "support_ticket_sample_102"]) assert.match(scripts["state.js"], new RegExp(sample));
+  assert.match(scripts["support-dashboard.js"], /requireRole\(\["support"\]\)/);
+  assert.match(scripts["support-dashboard.js"], /support-ticket-replied/);
+  assert.match(scripts["support-dashboard.js"], /support-ticket-status-changed/);
+});
+
 test("new restaurants require Super Admin licence approval before operations", () => {
   assert.match(scripts["auth.js"], /approvalStatus = "pending"/);
   assert.match(scripts["auth.js"], /awaiting Super Admin approval/);
@@ -226,7 +252,7 @@ test("checkout respects restaurant fulfillment preferences", () => {
 });
 
 test("staff delegated actions use a reloadable daily administrative token", () => {
-  assert.match(scripts["state.js"], /SCHEMA_VERSION = 13/);
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 15/);
   assert.match(scripts["state.js"], /administrativeToken: createAdministrativeToken\(\)/);
   assert.match(scripts["state.js"], /administrativeTokenExpiresAt: nextLocalMidnight\(\)/);
   assert.match(scripts["admin-settings.js"], /Daily administrative token/);
@@ -313,7 +339,7 @@ test("every mobile workspace destination receives a corresponding menu icon", ()
 });
 
 test("demo state includes coherent order, payment, reward, and cancellation history", () => {
-  assert.match(scripts["state.js"], /SCHEMA_VERSION = 13/);
+  assert.match(scripts["state.js"], /SCHEMA_VERSION = 15/);
   assert.match(scripts["state.js"], /function sampleHistory\(\)/);
   for (const sample of ["order_sample_100", "order_sample_101", "order_sample_102", "payment_sample_100", "auth_sample_102", "game_sample_100"]) assert.match(scripts["state.js"], new RegExp(sample));
   assert.match(scripts["state.js"], /status: "delivered"/);
