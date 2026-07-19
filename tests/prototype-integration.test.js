@@ -44,7 +44,7 @@ test("all referenced local scripts exist and parse", () => {
 });
 
 test("login separates customer and restaurant registration paths", () => {
-  assert.match(loginHtml, /Sign in to your workspace[\s\S]*Create customer account/);
+  assert.match(loginHtml, /Welcome back to Autoserve[\s\S]*Create customer account/);
   assert.match(loginHtml, /Are you a restaurant\?/);
   assert.match(loginHtml, /href="\.\/restaurant-signup\.html"/);
   assert.match(restaurantSignupHtml, /Restaurant company onboarding/);
