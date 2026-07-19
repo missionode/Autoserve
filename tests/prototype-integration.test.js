@@ -440,6 +440,10 @@ test("customer game corner includes unlimited practice mini-games", () => {
   assert.match(customerHtml, /mini-games\.js/);
   assert.match(scripts["mini-games.js"], /function startMemory/);
   assert.match(scripts["mini-games.js"], /function startTap/);
+  assert.match(scripts["mini-games.js"], /data-game-tab=\"ludo\"/);
+  assert.match(scripts["mini-games.js"], /data-game-panel=\"ludo\"/);
+  assert.match(scripts["mini-games.js"], /function playerRoll/);
+  assert.match(scripts["mini-games.js"], /function computerRoll/);
   assert.match(customerHtml, /Only Tic-Tac-Toe uses the complimentary reward attempt/);
 });
 

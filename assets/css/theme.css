@@ -321,6 +321,50 @@ body.mobile-menu-open {
   display: inline-flex;
 }
 
+.game-picker {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  border-radius: 1rem;
+  background: var(--color-surface-low);
+  padding: 0.5rem;
+  scrollbar-width: thin;
+}
+
+.game-picker-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 0.4rem 0.7rem 0.4rem 0.45rem;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.game-picker-button.is-active {
+  border-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: white;
+  color: var(--color-primary);
+  box-shadow: 0 6px 16px -12px rgba(25, 27, 36, 0.7);
+}
+
+.game-picker-icon {
+  display: inline-grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, currentColor 10%, white);
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .qr-print-card {
   width: min(100%, 26rem);
   margin-inline: auto;
