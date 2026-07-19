@@ -432,6 +432,17 @@ test("post-payment game shows an order-based countdown and simulates meal readin
   assert.match(scripts["tracking-game.js"], /setInterval\(\(\) => \{ simulatePreparation\(\); renderTracking\(\); \}, 1000\)/);
 });
 
+test("customer game corner includes unlimited practice mini-games", () => {
+  for (const game of ["tic-tac-toe", "memory", "tap-rush"]) {
+    assert.match(customerHtml, new RegExp(`data-game-tab="${game}"`));
+    assert.match(customerHtml, new RegExp(`data-game-panel="${game}"`));
+  }
+  assert.match(customerHtml, /mini-games\.js/);
+  assert.match(scripts["mini-games.js"], /function startMemory/);
+  assert.match(scripts["mini-games.js"], /function startTap/);
+  assert.match(customerHtml, /Only Tic-Tac-Toe uses the complimentary reward attempt/);
+});
+
 test("digital menu presents an Admin-configurable featured combo for guests and customers", () => {
   assert.match(customerHtml, /data-combo-section/);
   assert.match(scripts["state.js"], /comboSectionTitle: "Popular meal combos"/);
