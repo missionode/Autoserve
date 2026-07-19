@@ -71,7 +71,7 @@
 - [x] Define the operational dashboard.
 - [x] Define the chronological live token queue.
 - [x] Define preparation and fulfillment transitions.
-- [x] Define Staff cancellation using an Admin PIN.
+- [x] Define Staff cancellation using a daily administrative token.
 - [x] Define menu and category management.
 - [x] Define inventory control, low-stock alerts, and emergency cutoffs.
 - [x] Define inventory and order activity auditing.
@@ -109,7 +109,7 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 
 **Status:** `[-] In progress — implementation complete, user verification pending`
 
-- [x] Create the approved root, `customers/`, and `restaurants/` structure.
+- [x] Create the approved root, `customers/`, `restaurants/`, `super_admin/`, and `support/` structure.
 - [x] Create root `index.html`, `login.html`, `signup.html`, and `forgot-password.html` authentication pages.
 - [x] Route customer login, registration, and guest entry into `customers/`.
 - [x] Route Admin and Staff login into `restaurants/`.
@@ -117,7 +117,7 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 - [x] Create shared responsive layout, navigation, feedback, and dialog patterns.
 - [x] Define route/view switching for the multi-view SPA.
 - [x] Define the versioned Local Storage schema.
-- [x] Seed restaurant, menu, inventory, customer, Admin, and Staff demo data.
+- [x] Seed restaurant, menu, inventory, Customer, Admin, Staff, Super Admin, Support, history, and Support-request demo data.
 - [x] Implement shared state reads, writes, validation, migrations, and storage events.
 - [x] Implement role-aware route protection.
 - [x] Add common empty, loading, unauthorized, and error states.
@@ -219,6 +219,10 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 - [x] Display token, timing, payment, order, and status information.
 - [x] Implement Ready and Delivered notifications.
 - [x] Implement responsive Tic-Tac-Toe against a beatable computer.
+- [x] Implement compact responsive game selection.
+- [x] Implement practice-only Memory Match.
+- [x] Implement practice-only Tap Rush.
+- [x] Implement practice-only Ludo Race.
 - [x] Implement guest and practice-only game states.
 - [x] Implement one reward-eligible attempt per paid order.
 - [x] Persist win, loss, draw, and consumed-attempt states.
@@ -260,7 +264,7 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 **Status:** `[-] In progress — implementation complete, user verification pending`
 
 - [x] Implement Staff cancellation request and required reason.
-- [x] Implement protected Admin PIN authorization.
+- [x] Implement protected daily administrative-token authorization for Staff.
 - [x] Implement failed-PIN logging and rate limiting.
 - [x] Implement simulated refund state.
 - [x] Implement conditional inventory restoration.
@@ -286,7 +290,16 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 - [x] Implement Staff activation and deactivation.
 - [x] Implement restaurant profile and operating status.
 - [x] Implement tax, timing, token, reward, and PIN settings.
+- [x] Replace delegated Admin PIN operations with a reloadable daily administrative token.
+- [x] Implement configurable dine-in service modes, table numbers, and QR-derived table prefill.
+- [x] Implement branded printable restaurant, pickup-counter, and multi-table QR cards.
+- [x] Implement featured multi-combo configuration and customer slideshow.
+- [x] Implement Super Admin authentication, responsive workspace, restaurant directory, users, and platform activity.
+- [x] Implement restaurant company/licence onboarding and Super Admin approval or rejection.
+- [x] Implement Support authentication, responsive dashboard, request queue, replies, resolution, reopening, and activity.
 - [x] Implement role-aware customer and restaurant Help/FAQ views.
+- [x] Implement shared Support forms for Guest, Customer, Admin, Staff, and Super Admin.
+- [x] Implement requester-visible recent Support requests and replies.
 - [x] Implement required empty and recovery states.
 
 #### Exit criteria
@@ -320,7 +333,7 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 - [ ] Verify the complete guest customer journey.
 - [ ] Verify the complete signed-in and rewarded customer journey.
 - [ ] Verify the complete Staff fulfillment journey.
-- [ ] Verify Staff cancellation with Admin PIN.
+- [ ] Verify Staff cancellation with the current daily administrative token.
 - [ ] Verify the Admin management journey.
 - [ ] Verify data backup and recovery journey.
 - [x] Verify duplicate-action protection for payment, token, stock, reward, and cancellation.
@@ -329,6 +342,9 @@ Phase 3 is divided into implementation stages. Each stage must be completed in o
 - [x] Verify keyboard navigation, focus behavior, labels, and contrast structure; browser interaction acceptance pending.
 - [x] Verify loading, empty, failure, conflict, and recovery states.
 - [x] Verify no inaccessible Admin actions are exposed to Staff.
+- [x] Verify Super Admin and Support route protection and seeded prototype credentials.
+- [x] Verify Support submissions connect every Help workspace to the centralized request queue.
+- [x] Verify compact mobile game navigation and practice-game reward isolation.
 - [x] Resolve critical and high-severity defects found by automated and source-level verification.
 
 #### Automated verification evidence

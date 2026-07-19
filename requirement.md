@@ -2,13 +2,12 @@
 
 ## 1. Document Status
 
-- Product name: Autocode (working name; the inspiration template currently uses Autoserve)
+- Product name: Autoserve
 - Application category: Hotel/restaurant ordering, payment, KOT, and guest-waiting system
-- Prototype stage: Stage 2 — requirements definition
+- Prototype stage: Stage 3 — prototype implementation and browser acceptance
 - Inspiration design: Completed in `design_template/index.html`
-- Customer module: Approved
-- Restaurant/storefront module: To be discussed next
-- Prototype implementation: Begins after the requirements are approved
+- Customer, Restaurant, Super Admin, and Support modules: Implemented prototype; browser acceptance pending
+- Prototype implementation: Active, with automated integration verification
 
 ### Hotel/KOT workflow amendment (approved)
 
@@ -32,7 +31,7 @@
 - Application state managed in JavaScript
 - Local Storage used for prototype persistence and continuity
 - Responsive support for mobile, tablet, and desktop
-- Customer and restaurant experiences stored in separate folders
+- Customer, restaurant, Super Admin, and Support experiences stored in separate folders
 - All authentication and entry files stored at the project root
 - Successful login routes each user to the corresponding customer or restaurant folder
 
@@ -44,21 +43,24 @@
 ├── login.html
 ├── signup.html
 ├── forgot-password.html
+├── restaurant-signup.html
 ├── authentication.md
 ├── requirement.md
 ├── worksheet.md
 ├── customers/
 ├── restaurants/
+├── super_admin/
+├── support/
 └── design_template/
 ```
 
-All authentication pages remain at the root. Customer login, customer sign-up, and guest continuation route into `customers/`. Admin and Staff login route into `restaurants/`, where role-aware permissions determine the available views and actions. The exact internal folder structure may be refined without changing these routing and separation requirements.
+All authentication pages remain at the root. Customer login, customer sign-up, and guest continuation route into `customers/`. Admin and Staff route into `restaurants/`; Super Admin routes into `super_admin/`; and Support routes into `support/`. Role-aware permissions determine the available views and actions.
 
 ## 4. Customer Module
 
 ### 4.1 Customer objective
 
-The customer module must let a customer enter a restaurant experience, browse available items, build and pay for an order, receive a sequential token, track fulfillment, and play Tic-Tac-Toe while waiting. Signed-in customers with an eligible paid order can earn a complimentary item by winning the game.
+The customer module must let a customer enter a restaurant experience, browse available items, build and pay for an order, receive a sequential token, track fulfillment, contact Support, and use the Game corner while waiting. Signed-in customers with an eligible paid order can earn a complimentary item by winning Tic-Tac-Toe.
 
 ### 4.2 Roles and access levels
 
@@ -307,9 +309,16 @@ The tracking view displays:
 
 For the Local Storage prototype, open customer and restaurant tabs should synchronize relevant changes using browser storage events.
 
-### 4.12 Tic-Tac-Toe waiting game
+### 4.12 Waiting Game corner
 
-Tic-Tac-Toe is the only game included in the first prototype.
+The Game corner includes:
+
+- Tic-Tac-Toe against the computer, with the only reward-eligible attempt
+- Memory Match, an unlimited food-pair matching game
+- Tap Rush, an unlimited ten-second reaction game
+- Ludo Race, an unlimited customer-versus-computer dice race
+
+The game selector uses compact icon-and-name controls and horizontal overflow on narrow mobile screens.
 
 General game requirements:
 
@@ -325,6 +334,7 @@ General game requirements:
 - Responsive on mobile and desktop
 - Keeps token and order status visible while playing
 - Shows or triggers an order-ready interruption when fulfillment changes to Ready
+- Keeps additional games practice-only so they cannot issue or duplicate food rewards
 
 Guest message:
 
@@ -583,7 +593,7 @@ Open restaurant portal
 → Open the operational dashboard
 ```
 
-The seeded prototype usernames, passwords, Admin authorization PIN, and routing destinations are maintained in `authentication.md`.
+The seeded prototype usernames, passwords, owner recovery PIN, daily administrative-token behavior, and routing destinations are maintained in `authentication.md`.
 
 ### 5.3 Inventory activity audit
 
@@ -1252,7 +1262,7 @@ Open inventory
 Open active order
 → Request Cancellation
 → Enter reason
-→ Admin enters protected authorization PIN
+→ Staff enters the current daily administrative token shared by an Admin
 → Confirm stock-restoration choices when required
 → Simulated refund and cancellation are recorded once
 → Customer tracking updates
@@ -1281,6 +1291,35 @@ Open data preferences
 → Confirm operation
 → Complete successfully or roll back safely
 ```
+
+### 5.16 Platform administration and restaurant approval
+
+Restaurant company onboarding collects the legal business name, restaurant name, business type, company contacts, address, GSTIN, PAN, FSSAI number and expiry, trade licence and expiry, complaint contact, service model, and initial Admin credentials.
+
+- New restaurant applications begin in `Pending` approval status.
+- Super Admin can search the Restaurants directory, review company and licence details, approve or reject an application, and manage operating access.
+- An unapproved restaurant cannot enter normal Restaurant operations.
+- Super Admin provides Dashboard, Restaurants, Users, Activity, and Help destinations in responsive desktop and mobile navigation.
+- Platform mutations are recorded in the platform activity history.
+
+### 5.17 Support request workflow
+
+Guest, Customer, Admin, Staff, and Super Admin Help views provide a Support form containing topic, priority, subject, description, and optional reply contact.
+
+- Submission creates a stable Support reference and stores requester role, restaurant context, timestamps, messages, and status.
+- Requesters can see their recent requests and latest Support response.
+- The Support workspace provides Dashboard, Requests, and Activity destinations.
+- Support can search by reference, requester, subject, or topic and filter by status and priority.
+- Opening a new request assigns it to the Support agent and moves it to `In progress`.
+- Support can reply, resolve, reopen, and review recent activity.
+- Seed data includes open, urgent in-progress, and resolved examples.
+
+### 5.18 Responsive workspace navigation
+
+- Desktop headers expose role-appropriate destinations without showing the mobile menu control.
+- Tablet and mobile layouts use an accessible menu drawer with icons for each destination.
+- Mobile workspace headers align branding and Menu on the first row and distribute account/order actions on a consistent action row.
+- Customer floating Review order remains fixed near the bottom-right edge, is hidden during checkout, and the menu includes sufficient bottom spacing to prevent covering the final Quick add action.
 
 ## 6. Shared System Rules
 
@@ -1321,16 +1360,18 @@ Open data preferences
 The prototype is complete when:
 
 - The approved inspiration theme is applied consistently.
-- Customer and restaurant experiences are separated into their approved folders.
+- Customer, restaurant, Super Admin, and Support experiences are separated into their approved folders.
 - Root login and sign-up wrappers route users correctly.
 - Guest and signed-in customer journeys work with persistent state.
 - Menu, customization, cart, inventory checks, checkout, and payment simulation work end to end.
 - Successful payment creates exactly one order and sequential restaurant token.
 - Restaurant users can fulfill the order through the approved status sequence.
 - Customer tracking reflects restaurant status changes.
-- Tic-Tac-Toe works for guests and eligible signed-in customers.
+- The Game corner works for guests and signed-in customers, with rewards restricted to eligible Tic-Tac-Toe attempts.
 - An eligible win issues at most one in-stock current-order reward.
 - Admin and Staff permissions are enforced in navigation and actions.
+- Restaurant applications require Super Admin approval before operations.
+- Help submissions from every user type enter the searchable Support queue and support reply/resolution lifecycle.
 - Staff cancellation requires valid, unexpired daily administrative-token authorization.
 - Menu, inventory, alerts, history, reports, Staff accounts, and preferences follow the approved rules.
 - JSON export, validated import, backup, restoration, purge, and reset flows behave safely.
