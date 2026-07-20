@@ -1,0 +1,62 @@
+name: CI
+on:
+  pull_request:
+  push: { branches: [main] }
+permissions: { contents: read }
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:failure-gates
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run scan:secrets
+      - run: npm audit --audit-level=high
+  migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.5-alpine
+        env: { POSTGRES_DB: autoserve, POSTGRES_USER: autoserve, POSTGRES_PASSWORD: autoserve_ci }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U autoserve" --health-interval 5s --health-timeout 5s --health-retries 10
+    env: { DATABASE_URL: "postgresql://autoserve:autoserve_ci@localhost:5432/autoserve" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run validate:migrations
+      - run: npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+      - run: npm run seed
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_ORIGIN: https://api.invalid.example
+      DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
+      REDIS_URL: redis://localhost:6379
+      OBJECT_STORAGE_ENDPOINT: http://localhost:9000
+      OBJECT_STORAGE_REGION: ap-south-1
+      OBJECT_STORAGE_BUCKET: autoserve-ci
+      OBJECT_STORAGE_ACCESS_KEY: autoserve_ci_key
+      OBJECT_STORAGE_SECRET_KEY: autoserve_ci_secret_replace
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run build

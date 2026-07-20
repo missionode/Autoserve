@@ -1,0 +1,19 @@
+name: Deploy
+on: { workflow_dispatch: { inputs: { environment: { type: choice, options: [development, staging, production], required: true }, image_digest: { required: true } } } }
+permissions: { contents: read, id-token: write }
+concurrency: { group: "deploy-${{ inputs.environment }}", cancel-in-progress: false }
+jobs:
+  deploy:
+    environment: "${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate immutable artifact
+        run: test "${{ inputs.image_digest }}" != "${{ inputs.image_digest%@sha256:* }}"
+      - name: Deploy through environment-owned AWS role
+        run: ./scripts/deploy.sh "${{ inputs.environment }}" "${{ inputs.image_digest }}"
+      - name: Health and smoke checks
+        run: ./scripts/smoke.sh "${{ inputs.environment }}"
+      - name: Record rollback target
+        if: always()
+        run: echo "Artifact ${{ inputs.image_digest }} environment ${{ inputs.environment }} run ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
