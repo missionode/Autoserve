@@ -58,6 +58,36 @@
     redirectSession(session);
   }
 
+  function continueWithGoogle(mode) {
+    const googleId = "google_customer_demo";
+    const googleEmail = "google.customer@autoserve.demo";
+    try {
+      const current = stateApi.read();
+      const guestSession = current.activeSession;
+      const existing = current.users.find((user) => user.id === googleId || normalized(user.email) === googleEmail);
+      if (existing && !existing.active) {
+        setFeedback("This simulated Google customer account is inactive.", "error");
+        return;
+      }
+      const session = { id: existing?.id || googleId, role: "customer", name: existing?.name || "Google Demo Customer", restaurantId: guestSession?.restaurantId || existing?.restaurantId || "rest_autoserve_demo" };
+      stateApi.update((state) => {
+        let user = state.users.find((candidate) => candidate.id === session.id || normalized(candidate.email) === googleEmail);
+        if (!user) {
+          user = { id: googleId, role: "customer", name: "Google Demo Customer", email: googleEmail, mobile: "", authProvider: "google", active: true, createdAt: new Date().toISOString() };
+          state.users.push(user);
+        }
+        user.authProvider = "google";
+        user.lastLoginAt = new Date().toISOString();
+        transferGuestCart(state, guestSession, user.id);
+        state.activeSession = { ...session, id: user.id, name: user.name, signedInAt: new Date().toISOString(), authProvider: "google" };
+      }, mode === "signup" ? "google-customer-signup" : "google-customer-signin");
+      setFeedback(mode === "signup" ? "Google account created. Opening the customer experience…" : "Signed in with Google. Opening the customer experience…", "success");
+      global.setTimeout(() => redirectSession(session), 250);
+    } catch (_error) {
+      setFeedback("The simulated Google sign-in is unavailable because prototype data could not be loaded.", "error");
+    }
+  }
+
   function handleLogin(form) {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -186,6 +216,7 @@
   }
 
   document.querySelectorAll("[data-guest-entry]").forEach((button) => button.addEventListener("click", continueAsGuest));
+  document.querySelectorAll("[data-google-auth]").forEach((button) => button.addEventListener("click", () => continueWithGoogle(button.dataset.googleAuth)));
   const returnTo = new URLSearchParams(global.location.search).get("returnTo");
   if (returnTo) document.querySelectorAll('a[href*="signup.html"]').forEach((link) => { const target = new URL(link.href); target.searchParams.set("returnTo", returnTo); link.href = target.href; });
   const currentSession = app.getSession();

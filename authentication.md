@@ -12,6 +12,8 @@
 
 The seeded customer can place orders, track active orders, view history, submit Support requests, play all waiting games, and earn an eligible Tic-Tac-Toe reward.
 
+Customer login and registration also provide a simulated **Continue with Google** flow. It creates or reuses `google.customer@autoserve.demo`, preserves an active guest order, and does not contact Google or request real account data.
+
 ## Restaurant Admin
 
 - **Username / email:** `admin@autoserve.demo`

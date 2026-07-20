@@ -55,6 +55,30 @@ test("login separates customer and restaurant registration paths", () => {
   assert.match(scripts["auth.js"], /page === "restaurant-signup"/);
 });
 
+test("customer authentication offers a simulated Google flow", () => {
+  const signupHtml = read("signup.html");
+  assert.match(loginHtml, /data-google-auth="signin"/);
+  assert.match(loginHtml, /Customer sign in with Google/);
+  assert.match(loginHtml, /Google sign-in is available only for customers/);
+  assert.match(signupHtml, /data-google-auth="signup"/);
+  assert.match(signupHtml, /Sign up with Google/);
+  assert.match(scripts["auth.js"], /function continueWithGoogle/);
+  assert.match(scripts["auth.js"], /authProvider: "google"/);
+  assert.match(scripts["auth.js"], /google-customer-signup/);
+  assert.match(scripts["auth.js"], /google-customer-signin/);
+});
+
+test("password fields support visibility, confirmation, and strong generation", () => {
+  for (const file of ["login.html", "signup.html", "restaurant-signup.html", "restaurants/index.html", "super_admin/index.html"]) assert.match(read(file), /password-controls\.js/);
+  assert.match(scripts["password-controls.js"], /aria-label\", \"Show password\"/);
+  assert.match(scripts["password-controls.js"], /Confirm password/);
+  assert.match(scripts["password-controls.js"], /confirmAdminPin/);
+  assert.match(scripts["password-controls.js"], /confirmNewPin/);
+  assert.match(scripts["password-controls.js"], /Generate strong password/);
+  assert.match(scripts["password-controls.js"], /crypto\.getRandomValues/);
+  assert.match(scripts["password-controls.js"], /Passwords.*do not match/);
+});
+
 test("Super Admin login routes to a platform-wide user and restaurant dashboard", () => {
   const superAdminHtml = read("super_admin/index.html");
   assert.match(loginHtml, /Super Admin:<\/strong> superadmin \/ SuperAdmin@123/);

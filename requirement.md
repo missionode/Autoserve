@@ -108,6 +108,8 @@ A signed-in customer has all guest capabilities and can also:
 
 Customers can sign in, create an account, or continue as guests.
 
+Customer sign-in and sign-up provide a Google-branded prototype option. The local simulation creates or reuses a Google-provider customer, preserves guest order context, and must clearly state that no real Google OAuth exchange or account-data request occurs.
+
 Customer authentication uses the shared root pages. Successful customer login, registration, or guest continuation routes into the `customers/` application folder.
 
 Sign-up fields:
