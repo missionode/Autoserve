@@ -80,6 +80,13 @@
     return `<ol class="grid gap-2 sm:grid-cols-5">${statusOrder.map((status, index) => `<li class="rounded-xl border p-3 ${index <= currentIndex ? "border-blue-300 bg-blue-50 text-blue-900" : "border-slate-200 bg-white text-slate-400"}"><span class="block text-xs font-black">${index < currentIndex ? "✓" : index + 1}</span><span class="mt-1 block text-xs font-bold">${statusLabels[status]}</span></li>`).join("")}</ol>`;
   }
 
+  function activeOrderSummary(order) {
+    const serviceInstruction = order.serviceMode === "table-service"
+      ? `Service to ${order.tableNumber ? `table ${escapeHtml(order.tableNumber)}` : "your table"} when Ready`
+      : `Collect token #${escapeHtml(order.token)} from the pickup counter when Ready`;
+    return `<section class="mt-5 rounded-2xl border border-slate-200 p-4"><div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-black text-slate-950">Order summary</h3><span class="text-xs font-extrabold text-green-700">Payment confirmed · ${escapeHtml(order.transactionId || order.paymentId || "Recorded")}</span></div><div class="mt-3 divide-y divide-slate-100">${order.items.map((item) => { const details = [item.sizeName, item.spiceLevel, ...(item.addOns || []).map((option) => option.name), item.instructions].filter(Boolean).join(" · "); return `<div class="flex justify-between gap-4 py-3"><div><p class="text-sm font-extrabold text-slate-800">${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? ' <span class="text-purple-700">· Complimentary reward</span>' : ""}</p>${details ? `<p class="mt-1 text-xs text-slate-500">${escapeHtml(details)}</p>` : ""}</div><span class="text-sm font-bold text-slate-700">${formatter.format(item.lineTotal || 0)}</span></div>`; }).join("")}</div><p class="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-900">${serviceInstruction}</p></section>`;
+  }
+
   function renderTracking() {
     const state = global.AutoCodeState.read();
     const orders = customerOrders(state);
@@ -89,6 +96,7 @@
     if (active) {
       const reward = active.items.find((item) => item.rewardSource === "tic_tac_toe");
       tracker.innerHTML = `<article class="app-card overflow-hidden"><div class="flex flex-col justify-between gap-5 bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:p-8"><div><p class="text-sm font-bold text-blue-300">ACTIVE TOKEN</p><p class="mt-1 text-5xl font-black">#${escapeHtml(active.token)}</p><p class="mt-2 text-sm text-slate-300">${escapeHtml(elapsedText(active))} · Est. ${active.estimatedMinutes} min</p></div><div class="sm:text-right"><p class="text-sm font-bold text-slate-400">Current status</p><p class="mt-1 text-2xl font-black text-white">${escapeHtml(statusLabels[active.status])}</p><p class="mt-2 text-sm text-slate-300">${active.orderType === "dine-in" ? `Table ${escapeHtml(active.tableNumber)}` : "Takeaway"}</p></div></div><div class="p-6 sm:p-8">${statusTracker(active)}${countdownCard(active)}${reward ? `<div class="mt-5 rounded-xl bg-purple-50 p-4 text-sm font-bold text-purple-900">🎁 ${escapeHtml(reward.name)} added as your complimentary Tic-Tac-Toe reward.</div>` : ""}<div class="mt-6 flex flex-wrap gap-3"><a href="#/game" class="rounded-xl bg-blue-700 px-5 py-3 font-extrabold text-white">Play Tic-Tac-Toe</a><span class="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700">Paid ${formatter.format(active.total)}</span></div></div></article>`;
+      tracker.querySelector("article > div:last-child")?.insertAdjacentHTML("beforeend", activeOrderSummary(active));
     } else {
       tracker.innerHTML = orders.length ? `<div class="app-card p-6 text-center"><p class="font-bold text-slate-600">You have no active order.</p></div>` : "";
     }
@@ -122,7 +130,8 @@
       resume: "Your reward-eligible game is in progress and has been restored."
     };
     eligibility.innerHTML = `<p class="rounded-xl ${context.eligible ? "bg-green-50 text-green-900" : "bg-slate-100 text-slate-700"} p-4 text-sm font-bold leading-6">${escapeHtml(messages[context.reason])}</p>`;
-    document.querySelector("[data-game-message]").textContent = messages[context.reason];
+    const turnMessage = gameFinished ? "Match complete." : gamePaused ? "Match paused because your order is ready." : computerTurn ? "Computer’s turn." : "Your turn.";
+    document.querySelector("[data-game-message]").textContent = `${messages[context.reason]} ${turnMessage}`;
     orderBox.innerHTML = context.order ? `<p class="text-3xl font-black text-slate-950">#${escapeHtml(context.order.token)}</p><p class="mt-1 text-sm font-bold text-blue-700">${escapeHtml(statusLabels[context.order.status])}</p><p class="mt-2 text-xs text-slate-500">${escapeHtml(elapsedText(context.order))}</p>${countdownCard(context.order)}` : `<p class="text-sm font-bold text-slate-500">No active paid order</p>`;
   }
 
@@ -163,8 +172,21 @@
       gameContext = { eligible: context.eligible, orderId: context.order?.id || null, attemptId: null };
       if (context.eligible) {
         const attemptId = createId("game");
-        global.AutoCodeState.update((nextState) => { nextState.gameAttempts.push({ id: attemptId, restaurantId, customerId: session.id, orderId: context.order.id, game: "tic_tac_toe", rewardEligible: true, status: "in_progress", board: board.slice(), currentTurn: "customer", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); }, "eligible-game-started");
-        gameContext.attemptId = attemptId;
+        let claimedAttemptId = attemptId;
+        global.AutoCodeState.update((nextState) => {
+          const existing = nextState.gameAttempts.find((attempt) => attempt.orderId === context.order.id && attempt.rewardEligible);
+          if (existing) { claimedAttemptId = existing.id; return; }
+          nextState.gameAttempts.push({ id: attemptId, restaurantId, customerId: session.id, orderId: context.order.id, game: "tic_tac_toe", rewardEligible: true, status: "in_progress", board: board.slice(), currentTurn: "customer", startedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        }, "eligible-game-started");
+        const claimedAttempt = global.AutoCodeState.read().gameAttempts.find((attempt) => attempt.id === claimedAttemptId);
+        if (claimedAttempt?.status === "in_progress") {
+          gameContext.attemptId = claimedAttempt.id;
+          board = Array.isArray(claimedAttempt.board) ? claimedAttempt.board.slice(0, 9) : board;
+          while (board.length < 9) board.push("");
+          computerTurn = claimedAttempt.currentTurn === "computer";
+        } else {
+          gameContext = { eligible: false, orderId: context.order.id, attemptId: null };
+        }
       }
     }
     gameInitialized = true;
@@ -181,7 +203,7 @@
   }
 
   function rewardItemAvailable(item) {
-    return item && item.status === "published" && !["unavailable", "sold-out"].includes(item.availabilityStatus) && !item.emergencyCutoff;
+    return item && item.status === "published" && !["unavailable", "sold-out"].includes(item.availabilityStatus) && !item.emergencyCutoff && Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0)) > 0;
   }
 
   function completeGame(result) {
@@ -210,8 +232,8 @@
         return;
       }
       const restaurant = state.restaurants.find((candidate) => candidate.id === restaurantId);
-      const primary = state.menuItems.find((item) => item.id === restaurant.primaryRewardItemId);
-      const fallback = state.menuItems.find((item) => item.id === restaurant.fallbackRewardItemId);
+      const primary = state.menuItems.find((item) => item.restaurantId === restaurantId && item.id === restaurant?.primaryRewardItemId);
+      const fallback = state.menuItems.find((item) => item.restaurantId === restaurantId && item.id === restaurant?.fallbackRewardItemId);
       const reward = rewardItemAvailable(primary) ? primary : rewardItemAvailable(fallback) ? fallback : null;
       if (!reward) {
         attempt.rewardStatus = "manual_alternative";
@@ -220,8 +242,16 @@
         rewardMessage = " You won a reward; restaurant staff will provide an alternative.";
         return;
       }
+      const previousRewardQuantity = Math.max(0, Number(reward.availableQuantity ?? reward.stock ?? 0));
+      reward.availableQuantity = Math.max(0, previousRewardQuantity - 1);
+      reward.stock = Math.max(0, Number(reward.stock ?? previousRewardQuantity) - 1);
+      if (reward.availableQuantity === 0) {
+        reward.availabilityStatus = "sold-out";
+        reward.availabilityNote = "Complimentary reward inventory exhausted";
+      }
       reward.updatedAt = completedAt;
-      const rewardLine = { id: createId("reward"), key: `reward|${reward.id}`, itemId: reward.id, name: reward.name, icon: reward.icon, quantity: 1, sizeId: "regular", sizeName: "Regular", spiceLevel: "", addOnIds: [], addOns: [], instructions: "", basePrice: reward.price, unitPrice: 0, lineTotal: 0, rewardSource: "tic_tac_toe", addedAt: completedAt };
+      state.inventoryAudit.push({ id: createId("audit"), restaurantId, itemId: reward.id, itemName: reward.name, actorId: session.id, actorName: session.name, actorRole: session.role, changeType: "reward_deduction", previousQuantity: previousRewardQuantity, newQuantity: reward.availableQuantity, at: completedAt, note: `Tic-Tac-Toe reward for token #${order.token}` });
+      const rewardLine = { id: createId("reward"), key: `reward|${reward.id}`, itemId: reward.id, name: reward.name, rewardLabel: "Tic-Tac-Toe Reward — Complimentary", icon: reward.icon, quantity: 1, sizeId: "regular", sizeName: "Regular", spiceLevel: "", addOnIds: [], addOns: [], instructions: "", basePrice: reward.price, unitPrice: 0, lineTotal: 0, rewardSource: "tic_tac_toe", addedAt: completedAt };
       order.items.push(rewardLine);
       order.updatedAt = completedAt;
       order.timeline.push({ type: "reward_added", label: `${reward.name} added as a Tic-Tac-Toe reward`, at: completedAt, actor: "system" });
@@ -266,6 +296,18 @@
 
   function notifyReady(order) {
     gamePaused = true;
+    gameFinished = true;
+    global.AutoCodeState.update((state) => {
+      const attempt = state.gameAttempts.find((candidate) => candidate.orderId === order.id && candidate.rewardEligible && candidate.status === "in_progress");
+      if (!attempt) return;
+      const interruptedAt = new Date().toISOString();
+      attempt.status = "interrupted";
+      attempt.result = "ready_interruption";
+      attempt.board = board.slice();
+      attempt.completedAt = interruptedAt;
+      attempt.updatedAt = interruptedAt;
+      attempt.rewardStatus = "not_available";
+    }, "reward-game-interrupted-by-ready-order");
     renderBoard();
     document.querySelector("[data-ready-token]").textContent = `#${order.token}`;
     document.querySelector("[data-ready-title]").textContent = "Order ready";
@@ -285,9 +327,9 @@
   function checkStatusNotifications(state) {
     customerOrders(state).forEach((order) => {
       const previous = knownStatuses.get(order.id);
+      knownStatuses.set(order.id, order.status);
       if (previous && previous !== "ready" && order.status === "ready") notifyReady(order);
       if (previous && previous !== "delivered" && order.status === "delivered") notifyDelivered(order);
-      knownStatuses.set(order.id, order.status);
     });
   }
 

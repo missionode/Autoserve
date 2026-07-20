@@ -15,8 +15,16 @@
     if (!restaurant) throw new Error("This QR code refers to a restaurant that is not available in this prototype.");
     if (tableReference && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,19}$/.test(tableReference)) throw new Error("This QR code contains an invalid table reference.");
     if (serviceReference && !["self-service", "table-service"].includes(serviceReference)) throw new Error("This QR code contains an invalid service preference.");
+    const conflictingCarts = state.carts.filter((cart) => cart.ownerId === session.id && cart.restaurantId !== restaurant.id && cart.items.length > 0);
+    if (conflictingCarts.length && !global.confirm("Your current order belongs to another restaurant. Clear it and open this restaurant menu?")) {
+      throw new Error("Restaurant change cancelled. Your current order was kept.");
+    }
     global.AutoCodeState.update((nextState) => {
       if (!nextState.activeSession || nextState.activeSession.id !== session.id) return;
+      if (conflictingCarts.length) {
+        const conflictingIds = new Set(conflictingCarts.map((cart) => cart.id));
+        nextState.carts = nextState.carts.filter((cart) => !conflictingIds.has(cart.id));
+      }
       nextState.activeSession.restaurantId = restaurant.id;
       nextState.activeSession.entryContext = {
         source: "qr",

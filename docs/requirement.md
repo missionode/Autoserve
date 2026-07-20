@@ -4,10 +4,10 @@
 
 - Product name: Autoserve
 - Application category: Hotel/restaurant ordering, payment, KOT, and guest-waiting system
-- Prototype stage: Stage 3 — prototype implementation and browser acceptance
+- Prototype stage: Complete — stakeholder-approved prototype freeze
 - Inspiration design: Completed in `design_template/index.html`
-- Customer, Restaurant, Super Admin, and Support modules: Implemented prototype; browser acceptance pending
-- Prototype implementation: Active, with automated integration verification
+- Customer, Restaurant, Super Admin, and Support modules: Implemented and approved for the virtual prototype boundary
+- Prototype implementation: Complete and frozen; production development is documented separately
 
 ### Hotel/KOT workflow amendment (approved)
 
@@ -21,6 +21,8 @@
 - Cancelling an availability-based KOT does not restore numeric stock because no numeric stock was deducted.
 
 ## 2. Technical Constraints
+
+These constraints apply to the current browser prototype. They are not the production implementation stack. The recommended post-freeze development architecture is maintained in `technology-recommendation.md`.
 
 - Multi-view Single Page Application (SPA)
 - Pure HTML5
@@ -44,9 +46,26 @@
 ├── signup.html
 ├── forgot-password.html
 ├── restaurant-signup.html
-├── authentication.md
-├── requirement.md
-├── worksheet.md
+├── docs/
+│   ├── README.md
+│   ├── authentication.md
+│   ├── development-plan.md
+│   ├── production-decisions.md
+│   ├── requirement.md
+│   ├── subscription-billing.md
+│   ├── technology-recommendation.md
+│   ├── worksheet.md
+│   ├── development/
+│   │   ├── architecture-decisions.md
+│   │   ├── authorization-matrix.md
+│   │   ├── data-governance.md
+│   │   ├── data-flow-inventory.md
+│   │   ├── stage-4.0-approval-packet.md
+│   │   ├── provider-due-diligence.md
+│   │   └── stage-4.0-policy-resolution.md
+│   │   └── threat-model.md
+│   └── audit/
+│       └── journey-audit.md
 ├── customers/
 ├── restaurants/
 ├── super_admin/
@@ -130,6 +149,11 @@ Prototype authentication rules:
 - The UI must indicate that authentication is for prototype use and is not production security.
 - An existing guest cart is preserved when the customer signs in.
 - Associating a previously placed guest order with a newly created account is not automatic.
+- Every password field provides an accessible show/hide control without changing the stored value.
+- Creating or replacing a password requires a matching confirmation value.
+- Password creation provides Weak, Medium, or Strong guidance and an optional strong-password generator.
+- Generated passwords use browser cryptographic randomness and populate both password fields.
+- Creating or replacing an owner PIN requires matching PIN confirmation; authorization-only PIN/token entry does not.
 
 ### 4.5 Digital menu
 
@@ -1155,11 +1179,11 @@ Purging backups does not purge active application state.
 
 #### Prototype reset
 
-- Reset is Admin-only.
+- Reset is Admin-only and scoped to the Admin's selected restaurant; platform data and other restaurants remain unchanged.
 - Reset requires the Admin password or authorization PIN plus typed confirmation.
 - A final downloadable backup is offered before reset.
 - The reset scope is shown clearly.
-- Reset restores seeded prototype data and records a local reset event where possible.
+- Reset restores that restaurant's seeded prototype data and records a local reset event where possible. If no seed exists for the restaurant, reset is refused and export/import remains available.
 
 ### 5.12 Help and FAQ
 
@@ -1323,6 +1347,25 @@ Guest, Customer, Admin, Staff, and Super Admin Help views provide a Support form
 - Mobile workspace headers align branding and Menu on the first row and distribute account/order actions on a consistent action row.
 - Customer floating Review order remains fixed near the bottom-right edge, is hidden during checkout, and the menu includes sufficient bottom spacing to prevent covering the final Quick add action.
 
+### 5.19 Restaurant subscriptions and platform rates
+
+- Super Admin owns the platform billing configuration and monthly restaurant plan catalog.
+- Each plan has a stable identifier, name, monthly INR rate, feature list, availability, display order, and optional recommended marker.
+- Active plan rates are published directly to the Restaurant Admin Settings view.
+- Restaurant Admin can choose a plan and initiate UPI AutoPay mandate setup for monthly recurring billing.
+- Production subscription billing must use a provider-backed UPI AutoPay mandate, not a manually repeated one-time UPI collection.
+- The first successful mandate authorization/payment activates the subscription for one calendar month.
+- While the mandate remains active, monthly renewals are collected automatically and extend from the current period end.
+- Failed, pending, paused, revoked, expired, or cancelled mandates must not silently mark a new billing period as paid.
+- Every mandate/payment event records restaurant, plan, amount, method, masked payer reference where available, provider mandate reference, transaction reference, status, and timestamps.
+- Provider callbacks must be authenticated and processed idempotently on a backend before subscription access changes.
+- Restaurant Admin must be able to view AutoPay status, next debit date, payment history, and an option to cancel future renewal.
+- Successful payment records preserve a plan price-and-feature snapshot so later Super Admin rate changes do not rewrite history.
+- Restaurant Settings displays current plan/status, period end, available plans, and payment history.
+- Super Admin Settings displays plan editors and recent payments across restaurants.
+- Staff cannot change plans or access subscription payment actions.
+- The current Local Storage UI simulates Success, Pending, and Failure and makes no real charge or mandate. It represents the intended UPI AutoPay experience only; real recurring billing remains a production integration requirement.
+
 ## 6. Shared System Rules
 
 ### 6.1 Source of truth
@@ -1356,6 +1399,20 @@ Guest, Customer, Admin, Staff, and Super Admin Help views provide a Support form
 - Cross-device real-time synchronization is not provided.
 - The Play CDN and browser-based Tailwind setup are intended for prototyping, not production deployment.
 - Security-sensitive values stored client-side cannot provide production-grade protection.
+
+### 6.5 Journey-audit constraints
+
+The current source-level journey audit is maintained in `audit/journey-audit.md`. Until resolved or explicitly accepted, the following constraints apply:
+
+- Subscription status and advertised plan entitlements are not production access controls.
+- Subscription Pending attempts have no provider reconciliation in the local prototype.
+- Real payer identifiers must not be entered because prototype subscription data is stored in Local Storage.
+- Removed catalog plans retain the subscription's stored current-plan label and immutable payment snapshots; production retirement/migration policy remains undecided.
+- Upgrade, downgrade, proration, credit, and grace-period rules are not yet approved.
+- Guest Support history is recoverable only while the same local guest identity remains available.
+- One Local Storage `activeSession` is shared across tabs; parallel role testing should use isolated browser profiles.
+- Restaurant import validation covers current Support, authorization, and subscription collections and deliberately preserves platform settings outside Restaurant Admin scope.
+- Practice-only games reset on navigation or refresh; reward-eligible Tic-Tac-Toe persistence remains authoritative.
 
 ## 7. Complete Prototype Definition of Done
 

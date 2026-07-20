@@ -199,6 +199,28 @@
   enhanceActions(document);
   new MutationObserver((mutations) => mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => { if (node.nodeType === 1) enhanceActions(node); }))).observe(document.body, { childList: true, subtree: true });
 
+  function closeOpenPopdownMenus(except) {
+    document.querySelectorAll(".desktop-nav-more[open]").forEach((menu) => {
+      if (menu !== except) menu.removeAttribute("open");
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    const activeMenu = event.target.closest(".desktop-nav-more");
+    closeOpenPopdownMenus(activeMenu);
+    if (event.target.closest(".desktop-nav-more [data-route-link]")) activeMenu?.removeAttribute("open");
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const openMenu = document.querySelector(".desktop-nav-more[open]");
+    if (!openMenu) return;
+    openMenu.removeAttribute("open");
+    openMenu.querySelector("summary")?.focus();
+  });
+  document.addEventListener("toggle", (event) => {
+    if (event.target.matches?.(".desktop-nav-more[open]")) closeOpenPopdownMenus(event.target);
+  }, true);
+
   global.AutoCodeApp = Object.freeze({
     getSession,
     setSession,

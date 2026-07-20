@@ -10,17 +10,21 @@
   const receiptDialog = document.querySelector("#receipt-dialog");
   const formatter = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
   const terminalStatuses = ["delivered", "cancelled"];
+  const cancellableStatuses = ["payment_confirmed", "order_received", "preparing", "ready"];
   const prePreparationStatuses = ["payment_confirmed", "order_received"];
   const RATE_WINDOW_MS = 5 * 60 * 1000;
   const RATE_LOCK_MS = 60 * 1000;
   const MAX_PIN_FAILURES = 3;
   let cancellationOrderId = null;
-  let historyFilters = { search: "", status: "all", type: "all", time: "today", from: "", to: "", payment: "all", reward: "all", actor: "all" };
+  let historyFilters = { search: "", status: "all", type: "all", time: session.role === "staff" ? "session" : "today", from: "", to: "", payment: "all", reward: "all", actor: "all" };
 
   if (!cancellationDialog || !cancellationForm || !receiptDialog) return;
   const historyTimeSelect = document.querySelector("[data-history-time]");
   const reportRangeSelect = document.querySelector("[data-report-range]");
-  if (historyTimeSelect) historyTimeSelect.value = "today";
+  if (historyTimeSelect) {
+    historyTimeSelect.value = historyFilters.time;
+    if (session.role === "staff") [...historyTimeSelect.options].forEach((option) => { option.hidden = option.value !== "session"; option.disabled = option.value !== "session"; });
+  }
   if (reportRangeSelect) reportRangeSelect.value = "today";
   const delegatedTokenField = document.querySelector("[data-admin-pin-field]");
   delegatedTokenField.querySelector("span").textContent = "Daily administrative token";
@@ -37,6 +41,7 @@
   const ordersFor = (state) => state.orders.filter((order) => order.restaurantId === restaurantId);
   const dateKey = (value) => new Date(value).toLocaleDateString("en-CA");
   const rewardIssued = (order) => order.items.some((item) => item.rewardSource === "tic_tac_toe");
+  const canReopen = (order) => session.role === "admin" && order.status === "delivered" && new Date(order.deliveredAt || order.updatedAt).getTime() >= sessionStart();
 
   function setFeedback(message, error) {
     const target = document.querySelector("[data-cancellation-feedback]");
@@ -65,7 +70,7 @@
   function openCancellation(orderId) {
     const state = global.AutoCodeState.read();
     const order = ordersFor(state).find((entry) => entry.id === orderId);
-    if (!order || !["payment_confirmed", "order_received", "preparing", "ready"].includes(order.status)) {
+    if (!order || !cancellableStatuses.includes(order.status)) {
       global.alert("Only an active paid order can be cancelled.");
       return;
     }
@@ -74,9 +79,9 @@
     document.querySelector("[data-cancellation-feedback]").hidden = true;
     document.querySelector("[data-cancel-token]").textContent = `#${order.token}`;
     const automatic = prePreparationStatuses.includes(order.status);
-    const usesAvailability = order.inventoryModel === "availability";
-    document.querySelector("[data-restoration-help]").textContent = usesAvailability ? "This KOT uses kitchen item availability. No numeric stock was deducted, so nothing will be restored." : automatic ? "Preparation has not started, so all purchased and complimentary inventory will be restored automatically." : "Preparation has started. Select only items that can safely return to stock.";
-    document.querySelector("[data-restoration-items]").innerHTML = usesAvailability ? "" : order.items.map((item, index) => `<label class="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white p-3"><span class="text-sm font-bold text-slate-800">${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? " · Complimentary" : ""}</span><span class="flex items-center gap-2 text-xs font-bold text-amber-900"><input type="checkbox" name="restoreItem" value="${index}" ${automatic ? "checked disabled" : ""}> Return to stock</span></label>`).join("");
+    const tracksQuantity = order.inventoryModel === "quantity";
+    document.querySelector("[data-restoration-help]").textContent = !tracksQuantity ? "This legacy KOT did not deduct numeric inventory, so nothing will be restored." : automatic ? "Preparation has not started, so all purchased and complimentary inventory will be restored automatically." : "Preparation has started. Select only items that can safely return to stock.";
+    document.querySelector("[data-restoration-items]").innerHTML = !tracksQuantity ? "" : order.items.map((item, index) => `<label class="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white p-3"><span class="text-sm font-bold text-slate-800">${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? " · Complimentary" : ""}</span><span class="flex items-center gap-2 text-xs font-bold text-amber-900"><input type="checkbox" name="restoreItem" value="${index}" ${automatic ? "checked disabled" : ""}> Return to stock</span></label>`).join("");
     document.querySelector("[data-admin-pin-field]").hidden = session.role === "admin";
     cancellationForm.elements.adminPin.required = session.role === "staff";
     const lock = pinLockRemaining(state);
@@ -97,7 +102,7 @@
 
   function restoreInventory(state, order, selectedIndexes, automatic, timestamp) {
     if (order.inventoryRestoredAt) return [];
-    if (order.inventoryModel === "availability") {
+    if (order.inventoryModel !== "quantity") {
       order.inventoryRestoredAt = timestamp;
       order.restoredItems = [];
       return [];
@@ -107,14 +112,21 @@
       if (!automatic && !selectedIndexes.includes(index)) return;
       const item = state.menuItems.find((candidate) => candidate.id === line.itemId && candidate.restaurantId === restaurantId);
       if (!item) return;
-      const previous = item.stock;
-      item.stock += Number(line.quantity || 0);
-      if (item.stock > 0 && item.status === "sold-out") item.status = "published";
+      const quantity = Number(line.quantity || 0);
+      const previousPhysical = Math.max(0, Number(item.stock || 0));
+      const previousSellable = Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0));
+      item.stock = previousPhysical + quantity;
+      item.availableQuantity = previousSellable + quantity;
+      if (item.status === "sold-out") item.status = "published";
+      if (item.status === "published" && !item.emergencyCutoff && ["available", "limited", "sold-out"].includes(item.availabilityStatus)) {
+        item.availabilityStatus = item.availableQuantity <= Number(item.lowStockThreshold || 0) ? "limited" : "available";
+        item.availabilityNote = "";
+      }
       item.updatedAt = timestamp;
       item.lastUpdatedBy = session.id;
       item.lastUpdatedByName = session.name;
-      state.inventoryAudit.push({ id: createId("audit"), restaurantId, itemId: item.id, itemName: item.name, actorId: session.id, actorName: session.name, actorRole: session.role, changeType: "cancellation_restoration", previousQuantity: previous, newQuantity: item.stock, at: timestamp, note: `Restored from cancelled token #${order.token}` });
-      restored.push({ itemId: item.id, name: item.name, quantity: Number(line.quantity || 0) });
+      state.inventoryAudit.push({ id: createId("audit"), restaurantId, itemId: item.id, itemName: item.name, actorId: session.id, actorName: session.name, actorRole: session.role, changeType: "cancellation_restoration", previousQuantity: previousSellable, newQuantity: item.availableQuantity, at: timestamp, note: `Restored ${quantity} from cancelled token #${order.token} · physical ${previousPhysical} → ${item.stock}` });
+      restored.push({ itemId: item.id, name: item.name, quantity });
     });
     order.inventoryRestoredAt = timestamp;
     order.restoredItems = restored;
@@ -130,11 +142,11 @@
     const lock = pinLockRemaining(initial);
     if (lock > 0) { setFeedback(`Token authorization is rate-limited for ${Math.ceil(lock / 1000)} more seconds.`, true); return; }
 
-    let authorizer = session.role === "admin" ? initial.users.find((user) => user.id === session.id) : null;
+    const submittedToken = String(data.get("adminPin") || "").trim();
+    let authorizer = session.role === "admin" ? initial.users.find((user) => user.id === session.id && user.active) : null;
     if (session.role === "staff") {
       const restaurant = initial.restaurants.find((entry) => entry.id === restaurantId);
       const tokenExpired = new Date(restaurant?.administrativeTokenExpiresAt || 0).getTime() <= Date.now();
-      const submittedToken = String(data.get("adminPin") || "").trim();
       authorizer = !tokenExpired && submittedToken === restaurant?.administrativeToken ? initial.users.find((user) => user.restaurantId === restaurantId && user.role === "admin" && user.active) : null;
       if (!authorizer) {
         recordFailedToken(cancellationOrderId, tokenExpired ? "expired_administrative_token" : "invalid_administrative_token");
@@ -152,16 +164,25 @@
         if (!order) throw new Error("This order no longer exists.");
         if (order.status === "cancelled" || order.refund?.status === "refunded") throw new Error("This order was already cancelled and refunded.");
         if (order.status === "delivered") throw new Error("A delivered order cannot be cancelled. An Admin may reopen it first.");
+        if (!cancellableStatuses.includes(order.status)) throw new Error("This order is no longer active and cannot be cancelled.");
+        if (session.role === "staff") {
+          const currentRestaurant = state.restaurants.find((entry) => entry.id === restaurantId);
+          const currentAuthorizer = state.users.find((user) => user.restaurantId === restaurantId && user.role === "admin" && user.active);
+          if (!currentAuthorizer || new Date(currentRestaurant?.administrativeTokenExpiresAt || 0).getTime() <= Date.now() || submittedToken !== currentRestaurant?.administrativeToken) throw new Error("Administrative token changed or expired before authorization. Ask an Admin for the current token.");
+          authorizer = currentAuthorizer;
+        }
         const timestamp = now();
         const automatic = prePreparationStatuses.includes(order.status);
         const statusAtCancellation = order.status;
         const restored = restoreInventory(state, order, selectedIndexes, automatic, timestamp);
         order.status = "cancelled";
+        order.kotStatus = "cancelled";
         order.updatedAt = timestamp;
         order.cancelledAt = timestamp;
         order.cancelledBy = session.id;
         order.cancellation = { id: createId("cancel"), reasonType: String(data.get("reasonType")), reason, requestedBy: session.id, requestedByName: session.name, authorizedBy: authorizer.id, authorizedByName: authorizer.name, statusAtCancellation, restoredItems: restored, at: timestamp };
-        order.refund = { id: createId("refund"), status: "refunded", mode: "simulated", amount: order.total, transactionId: `SIM-REF-${Date.now()}`, createdAt: timestamp };
+        const paidTotal = Number(order.paidSnapshot?.total ?? order.total ?? 0);
+        order.refund = { id: createId("refund"), status: "refunded", mode: "simulated", amount: paidTotal, transactionId: `SIM-REF-${Date.now()}`, createdAt: timestamp };
         order.paymentStatus = "refunded";
         const payment = state.payments.find((entry) => entry.id === order.paymentId);
         if (payment && payment.status !== "refunded") { payment.status = "refunded"; payment.refundId = order.refund.id; payment.refundedAt = timestamp; payment.updatedAt = timestamp; }
@@ -169,12 +190,16 @@
         state.authorizationAttempts.push({ id: createId("auth_attempt"), restaurantId, orderId: order.id, actorId: session.id, actorName: session.name, authorizerId: authorizer.id, authorizerName: authorizer.name, action: "order_cancellation", success: true, at: timestamp });
         order.timeline.push({ type: "cancellation_requested", label: `Cancellation requested: ${reason}`, at: timestamp, actor: session.id, actorName: session.name });
         order.timeline.push({ type: "cancellation_authorized", label: `Cancellation authorized by ${authorizer.name}`, at: timestamp, actor: authorizer.id, actorName: authorizer.name });
-        order.timeline.push({ type: "order_cancelled", label: `Order cancelled · simulated refund ${formatter.format(order.total)}`, at: timestamp, actor: session.id, actorName: session.name });
+        order.timeline.push({ type: "order_cancelled", label: `Order cancelled · simulated refund ${formatter.format(paidTotal)}`, at: timestamp, actor: session.id, actorName: session.name });
+        order.timeline.push({ type: "refund_created", label: `Simulated refund ${order.refund.transactionId} recorded`, at: timestamp, actor: "system", actorName: "System" });
       }, "order-cancelled-refunded");
       global.AutoCodeApp.closeDialog(cancellationDialog, "cancelled");
       cancellationOrderId = null;
       renderAll();
-    } catch (error) { setFeedback(error.message, true); }
+    } catch (error) {
+      if (session.role === "staff" && error.message.startsWith("Administrative token changed or expired")) recordFailedToken(cancellationOrderId, "stale_administrative_token");
+      setFeedback(error.message, true);
+    }
   }
 
   function reopenOrder(orderId) {
@@ -189,14 +214,17 @@
     try {
       global.AutoCodeState.update((nextState) => {
         const current = ordersFor(nextState).find((entry) => entry.id === orderId);
-        if (!current || current.status !== "delivered") throw new Error("This order changed in another tab.");
+        if (!current || current.status !== "delivered" || current.updatedAt !== order.updatedAt) throw new Error("This order changed in another tab.");
         const timestamp = now();
         current.status = "ready";
+        current.kotStatus = "ready";
         current.updatedAt = timestamp;
         current.reopenedAt = timestamp;
         current.reopenedBy = session.id;
         current.reopenReason = reason;
         current.timeline.push({ type: "order_reopened", label: `Reopened as Ready: ${reason}`, at: timestamp, actor: session.id, actorName: session.name });
+        nextState.authorizationAttempts ||= [];
+        nextState.authorizationAttempts.push({ id: createId("auth_attempt"), restaurantId, orderId: current.id, actorId: session.id, actorName: session.name, authorizerId: session.id, authorizerName: session.name, action: "delivered_order_reopened", success: true, reason, at: timestamp });
       }, "delivered-order-reopened");
       renderAll();
     } catch (error) { global.alert(error.message); }
@@ -216,8 +244,9 @@
       if (historyFilters.search && !`${text} ${actors}`.includes(historyFilters.search)) return false;
       if (historyFilters.status !== "all" && order.status !== historyFilters.status) return false;
       if (historyFilters.type !== "all" && order.orderType !== historyFilters.type) return false;
-      if (historyFilters.time === "session" && new Date(completedAt).getTime() < sessionStart()) return false;
-      if (historyFilters.time === "today" && dateKey(completedAt) !== today) return false;
+      const effectiveTime = session.role === "staff" ? "session" : historyFilters.time;
+      if (effectiveTime === "session" && new Date(completedAt).getTime() < sessionStart()) return false;
+      if (effectiveTime === "today" && dateKey(completedAt) !== today) return false;
       if (session.role === "admin" && !matchesDate(completedAt, historyFilters.from, historyFilters.to)) return false;
       if (historyFilters.payment !== "all" && order.paymentStatus !== historyFilters.payment) return false;
       if (historyFilters.reward === "yes" && !rewardIssued(order)) return false;
@@ -239,7 +268,7 @@
     }
     document.querySelector("[data-history-scope]").textContent = session.role === "admin" ? "Review retained receipts, refunds, rewards, and activity." : historyFilters.time === "today" ? "Completed and cancelled orders from today." : "Completed and cancelled orders from your current signed-in session.";
     document.querySelector("[data-history-empty]").hidden = orders.length > 0;
-    document.querySelector("[data-history-list]").innerHTML = orders.map((order) => `<article class="app-card p-5"><div class="flex items-start justify-between gap-4"><div><div class="flex items-center gap-2"><h2 class="text-2xl font-black text-slate-950">#${escapeHtml(order.token)}</h2><span class="rounded-full px-2.5 py-1 text-xs font-extrabold ${order.status === "cancelled" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}">${order.status === "cancelled" ? "Cancelled" : "Delivered"}</span>${rewardIssued(order) ? '<span class="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-extrabold text-purple-800">Reward</span>' : ""}</div><p class="mt-2 text-sm font-bold text-slate-700">${escapeHtml(order.customerName || "Guest")} · ${escapeHtml(order.orderType)}</p><p class="mt-1 text-xs text-slate-500">${new Date(order.cancelledAt || order.deliveredAt || order.updatedAt).toLocaleString("en-IN")} · ${escapeHtml(order.id)}</p></div><p class="text-right font-black text-slate-900">${formatter.format(order.total)}<br><span class="text-xs font-bold ${order.paymentStatus === "refunded" ? "text-red-700" : "text-green-700"}">${escapeHtml(order.paymentStatus)}</span></p></div>${order.cancellation ? `<p class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-900"><strong>Reason:</strong> ${escapeHtml(order.cancellation.reason)}<br><strong>Authorized by:</strong> ${escapeHtml(order.cancellation.authorizedByName)}</p>` : ""}<div class="mt-4 flex flex-wrap gap-2"><button data-view-receipt="${escapeHtml(order.id)}" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">View receipt</button>${session.role === "admin" && order.status === "delivered" ? `<button data-reopen-order="${escapeHtml(order.id)}" class="rounded-lg border border-amber-300 px-4 py-2 text-sm font-bold text-amber-800">Reopen as Ready</button>` : ""}</div></article>`).join("");
+    document.querySelector("[data-history-list]").innerHTML = orders.map((order) => `<article class="app-card p-5"><div class="flex items-start justify-between gap-4"><div><div class="flex items-center gap-2"><h2 class="text-2xl font-black text-slate-950">#${escapeHtml(order.token)}</h2><span class="rounded-full px-2.5 py-1 text-xs font-extrabold ${order.status === "cancelled" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}">${order.status === "cancelled" ? "Cancelled" : "Delivered"}</span>${rewardIssued(order) ? '<span class="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-extrabold text-purple-800">Reward</span>' : ""}</div><p class="mt-2 text-sm font-bold text-slate-700">${escapeHtml(order.customerName || "Guest")} · ${escapeHtml(order.orderType)}</p><p class="mt-1 text-xs text-slate-500">${new Date(order.cancelledAt || order.deliveredAt || order.updatedAt).toLocaleString("en-IN")} · ${escapeHtml(order.id)}</p></div><p class="text-right font-black text-slate-900">${formatter.format(order.paidSnapshot?.total ?? order.total)}<br><span class="text-xs font-bold ${order.paymentStatus === "refunded" ? "text-red-700" : "text-green-700"}">${escapeHtml(order.paymentStatus)}</span></p></div>${order.cancellation ? `<p class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-900"><strong>Reason:</strong> ${escapeHtml(order.cancellation.reason)}<br><strong>Authorized by:</strong> ${escapeHtml(order.cancellation.authorizedByName)}</p>` : ""}<div class="mt-4 flex flex-wrap gap-2"><button data-view-receipt="${escapeHtml(order.id)}" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">View receipt</button>${canReopen(order) ? `<button data-reopen-order="${escapeHtml(order.id)}" class="rounded-lg border border-amber-300 px-4 py-2 text-sm font-bold text-amber-800">Reopen as Ready</button>` : ""}</div></article>`).join("");
   }
 
   function openReceipt(orderId) {
@@ -251,7 +280,7 @@
     const receiptItems = [...snapshot.items, ...order.items.filter((item) => item.rewardSource)];
     document.querySelector("[data-receipt-token]").textContent = `#${order.token}`;
     const content = document.querySelector("[data-receipt-content]");
-    content.innerHTML = `<div class="grid gap-3 rounded-xl bg-slate-100 p-4 sm:grid-cols-2"><div><p class="text-xs font-bold text-slate-500">Order ID</p><p class="mt-1 break-all text-sm font-extrabold">${escapeHtml(order.id)}</p></div><div><p class="text-xs font-bold text-slate-500">Paid</p><p class="mt-1 text-sm font-extrabold">${new Date(snapshot.capturedAt).toLocaleString("en-IN")}</p></div><div><p class="text-xs font-bold text-slate-500">Transaction</p><p class="mt-1 break-all text-sm font-extrabold">${escapeHtml(order.transactionId || payment?.transactionId || "—")}</p></div><div><p class="text-xs font-bold text-slate-500">Payment / order</p><p class="mt-1 text-sm font-extrabold capitalize">${escapeHtml(order.paymentStatus)} · ${escapeHtml(order.status)}</p></div></div><div class="mt-5 divide-y divide-slate-200">${receiptItems.map((item) => `<div class="flex justify-between gap-4 py-4"><div><p class="font-extrabold text-slate-900">${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? ' <span class="text-purple-700">· Complimentary</span>' : ""}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml([item.sizeName, item.spiceLevel, ...(item.addOns || []).map((entry) => entry.name)].filter(Boolean).join(" · "))}</p></div><p class="font-bold">${formatter.format(item.lineTotal || 0)}</p></div>`).join("")}</div><dl class="mt-5 space-y-2 border-t-2 border-slate-900 pt-4"><div class="flex justify-between"><dt>Subtotal</dt><dd class="font-bold">${formatter.format(snapshot.subtotal)}</dd></div><div class="flex justify-between"><dt>Tax (${snapshot.taxPercent}%)</dt><dd class="font-bold">${formatter.format(snapshot.tax)}</dd></div><div class="flex justify-between text-lg font-black"><dt>Total paid</dt><dd>${formatter.format(snapshot.total)}</dd></div>${order.refund ? `<div class="flex justify-between font-bold text-red-700"><dt>Simulated refund</dt><dd>${formatter.format(order.refund.amount)}</dd></div>` : ""}</dl>${order.cancellation ? `<div class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-900"><strong>Cancellation:</strong> ${escapeHtml(order.cancellation.reason)}<br><strong>Refund ID:</strong> ${escapeHtml(order.refund?.transactionId || "—")}</div>` : ""}<section class="mt-6"><h3 class="font-black text-slate-950">Activity snapshot</h3><ol class="mt-3 space-y-2">${(order.timeline || []).map((event) => `<li class="border-l-2 border-slate-200 pl-3 text-sm"><strong>${escapeHtml(event.label)}</strong><br><span class="text-xs text-slate-500">${new Date(event.at).toLocaleString("en-IN")} · ${escapeHtml(event.actorName || event.actor)}</span></li>`).join("")}</ol></section>`;
+    content.innerHTML = `<div class="grid gap-3 rounded-xl bg-slate-100 p-4 sm:grid-cols-2"><div><p class="text-xs font-bold text-slate-500">Order ID</p><p class="mt-1 break-all text-sm font-extrabold">${escapeHtml(order.id)}</p></div><div><p class="text-xs font-bold text-slate-500">Paid</p><p class="mt-1 text-sm font-extrabold">${new Date(snapshot.capturedAt).toLocaleString("en-IN")}</p></div><div><p class="text-xs font-bold text-slate-500">Transaction</p><p class="mt-1 break-all text-sm font-extrabold">${escapeHtml(order.transactionId || payment?.transactionId || "—")}</p></div><div><p class="text-xs font-bold text-slate-500">Payment / order</p><p class="mt-1 text-sm font-extrabold capitalize">${escapeHtml(order.paymentStatus)} · ${escapeHtml(order.status)}</p></div></div><div class="mt-5 divide-y divide-slate-200">${receiptItems.map((item) => `<div class="flex justify-between gap-4 py-4"><div><p class="font-extrabold text-slate-900">${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? ' <span class="text-purple-700">· Complimentary</span>' : ""}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml([item.sizeName, item.spiceLevel, ...(item.addOns || []).map((entry) => entry.name), item.instructions].filter(Boolean).join(" · "))}</p></div><p class="font-bold">${formatter.format(item.lineTotal || 0)}</p></div>`).join("")}</div><dl class="mt-5 space-y-2 border-t-2 border-slate-900 pt-4"><div class="flex justify-between"><dt>Subtotal</dt><dd class="font-bold">${formatter.format(snapshot.subtotal)}</dd></div><div class="flex justify-between"><dt>Tax (${snapshot.taxPercent}%)</dt><dd class="font-bold">${formatter.format(snapshot.tax)}</dd></div><div class="flex justify-between text-lg font-black"><dt>Total paid</dt><dd>${formatter.format(snapshot.total)}</dd></div>${order.refund ? `<div class="flex justify-between font-bold text-red-700"><dt>Simulated refund</dt><dd>${formatter.format(order.refund.amount)}</dd></div>` : ""}</dl>${order.cancellation ? `<div class="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-900"><strong>Cancellation:</strong> ${escapeHtml(order.cancellation.reason)}<br><strong>Refund ID:</strong> ${escapeHtml(order.refund?.transactionId || "—")}</div>` : ""}<section class="mt-6"><h3 class="font-black text-slate-950">Activity snapshot</h3><ol class="mt-3 space-y-2">${(order.timeline || []).map((event) => `<li class="border-l-2 border-slate-200 pl-3 text-sm"><strong>${escapeHtml(event.label)}</strong><br><span class="text-xs text-slate-500">${new Date(event.at).toLocaleString("en-IN")} · ${escapeHtml(event.actorName || event.actor)}</span></li>`).join("")}</ol></section>`;
     global.AutoCodeApp.openDialog(receiptDialog);
   }
 
@@ -279,12 +308,13 @@
     const cancelled = orders.filter((order) => order.status === "cancelled");
     const paid = orders.filter((order) => ["success", "refunded"].includes(order.paymentStatus));
     const realized = paid.filter((order) => order.status !== "cancelled");
-    const average = realized.length ? realized.reduce((sum, order) => sum + order.total, 0) / realized.length : 0;
+    const paidTotal = (order) => Number(order.paidSnapshot?.total ?? order.total ?? 0);
+    const average = realized.length ? realized.reduce((sum, order) => sum + paidTotal(order), 0) / realized.length : 0;
     const preparation = delivered.map((order) => (new Date(order.readyAt || order.deliveredAt) - new Date(order.preparingAt || order.createdAt)) / 60000).filter((value) => value >= 0);
     const waiting = delivered.map((order) => (new Date(order.deliveredAt) - new Date(order.readyAt || order.deliveredAt)) / 60000).filter((value) => value >= 0);
-    const delayed = orders.filter((order) => order.readyAt && (new Date(order.readyAt) - new Date(order.createdAt)) / 60000 > Number(order.estimatedMinutes || 10));
+    const delayed = delivered.filter((order) => order.readyAt && (new Date(order.readyAt) - new Date(order.createdAt)) / 60000 > Number(order.estimatedMinutes || 10));
     document.querySelector("[data-report-metrics]").innerHTML = [
-      metricCard("Total sales", formatter.format(realized.reduce((sum, order) => sum + order.total, 0)), "text-blue-800"), metricCard("Paid orders", String(paid.length)),
+      metricCard("Total sales", formatter.format(realized.reduce((sum, order) => sum + paidTotal(order), 0)), "text-blue-800"), metricCard("Paid orders", String(paid.length)),
       metricCard("Delivered", String(delivered.length), "text-green-700"), metricCard("Cancelled", String(cancelled.length), "text-red-700"),
       metricCard("Average order", formatter.format(average)), metricCard("Average preparation", preparation.length ? `${Math.round(preparation.reduce((a, b) => a + b, 0) / preparation.length)} min` : "—"),
       metricCard("Ready-to-delivery", waiting.length ? `${Math.round(waiting.reduce((a, b) => a + b, 0) / waiting.length)} min` : "—"), metricCard("Delayed orders", String(delayed.length), "text-amber-700"),
@@ -292,7 +322,7 @@
     ].join("");
 
     const itemCounts = new Map();
-    orders.forEach((order) => order.items.filter((item) => !item.rewardSource).forEach((item) => itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + item.quantity)));
+    realized.forEach((order) => (order.paidSnapshot?.items || order.items.filter((item) => !item.rewardSource)).forEach((item) => itemCounts.set(item.name, (itemCounts.get(item.name) || 0) + Number(item.quantity || 0))));
     const topItems = [...itemCounts].sort((a, b) => b[1] - a[1]).slice(0, 8);
     document.querySelector("[data-report-items]").innerHTML = topItems.length ? topItems.map(([name, count], index) => `<div class="flex justify-between border-b border-slate-100 py-3"><span class="font-bold">${index + 1}. ${escapeHtml(name)}</span><span>${count}</span></div>`).join("") : '<p class="text-sm text-slate-500">No item sales in this range.</p>';
 
@@ -302,8 +332,8 @@
 
     const paymentStatuses = ["success", "failure", "cancelled", "pending", "refunded"];
     document.querySelector("[data-report-payments]").innerHTML = paymentStatuses.map((status) => `<div class="flex justify-between border-b border-slate-100 py-3"><span class="font-bold capitalize">${status}</span><span>${payments.filter((payment) => payment.status === status).length}</span></div>`).join("");
-    const stock = state.menuItems.filter((item) => item.restaurantId === restaurantId && ["limited", "unavailable", "sold-out"].includes(item.availabilityStatus));
-    document.querySelector("[data-report-stock]").innerHTML = stock.length ? stock.map((item) => `<div class="flex justify-between border-b border-slate-100 py-3"><span class="font-bold">${escapeHtml(item.name)}</span><span class="${item.availabilityStatus === "limited" ? "text-amber-700" : "text-red-700"}">${item.availabilityStatus === "limited" ? "Limited" : item.availabilityStatus === "sold-out" ? "Sold out today" : "Unavailable"}</span></div>`).join("") : '<p class="text-sm text-slate-500">All published kitchen items are available.</p>';
+    const stock = state.menuItems.filter((item) => item.restaurantId === restaurantId && item.status === "published" && (item.emergencyCutoff || Number(item.availableQuantity ?? item.stock ?? 0) <= Number(item.lowStockThreshold || 0) || ["limited", "unavailable", "sold-out"].includes(item.availabilityStatus)));
+    document.querySelector("[data-report-stock]").innerHTML = stock.length ? stock.map((item) => { const quantity = Number(item.availableQuantity ?? item.stock ?? 0); const label = item.emergencyCutoff ? "Emergency cutoff" : item.availabilityStatus === "sold-out" || quantity === 0 ? "Sold out today" : item.availabilityStatus === "unavailable" ? "Unavailable" : `Low stock · ${quantity}`; return `<div class="flex justify-between border-b border-slate-100 py-3"><span class="font-bold">${escapeHtml(item.name)}</span><span class="${label.startsWith("Low stock") ? "text-amber-700" : "text-red-700"}">${escapeHtml(label)}</span></div>`; }).join("") : '<p class="text-sm text-slate-500">All published kitchen items are available.</p>';
   }
 
   function renderAll() { renderHistory(); renderReports(); }

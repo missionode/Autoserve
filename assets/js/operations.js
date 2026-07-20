@@ -24,30 +24,38 @@
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
   const minutesSince = (timestamp) => Math.max(0, Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000));
   const todayKey = (timestamp) => new Date(timestamp).toLocaleDateString("en-CA");
+  const phaseTimer = (order) => order.status === "ready"
+    ? { minutes: minutesSince(order.readyAt || order.updatedAt), label: "waiting since Ready" }
+    : order.status === "preparing"
+      ? { minutes: minutesSince(order.preparingAt || order.updatedAt), label: "preparing" }
+      : { minutes: minutesSince(order.createdAt), label: "elapsed" };
 
   function restaurantOrders(state) {
     return state.orders.filter((order) => order.restaurantId === restaurantId).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }
 
-  function urgencyFor(order) {
+  function urgencyFor(order, restaurant) {
     if (order.status === "ready") return { label: "Ready", classes: "bg-green-100 text-green-800 border-green-200" };
     const elapsed = minutesSince(order.createdAt);
-    const estimate = Number(order.estimatedMinutes || 10);
-    if (elapsed > estimate) return { label: "Delayed", classes: "bg-red-100 text-red-800 border-red-200" };
-    if (elapsed >= Math.max(1, estimate - 3)) return { label: "Due soon", classes: "bg-amber-100 text-amber-900 border-amber-200" };
+    const estimate = Number(order.estimatedMinutes || restaurant?.defaultPreparationMinutes || 10);
+    const warningAt = Number(restaurant?.warningMinutes || Math.max(1, estimate - 3));
+    const delayedAt = Number(restaurant?.delayedMinutes || estimate);
+    if (elapsed >= delayedAt) return { label: "Delayed", classes: "bg-red-100 text-red-800 border-red-200" };
+    if (elapsed >= warningAt) return { label: "Due soon", classes: "bg-amber-100 text-amber-900 border-amber-200" };
     return { label: "On time", classes: "bg-slate-100 text-slate-700 border-slate-200" };
   }
 
-  function orderCard(order, compact) {
+  function orderCard(order, compact, restaurant) {
     const status = statusDetails[order.status] || { label: order.status, action: null };
-    const urgency = urgencyFor(order);
+    const urgency = urgencyFor(order, restaurant);
+    const timer = phaseTimer(order);
     const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
     const reward = order.items.some((item) => item.rewardSource === "tic_tac_toe");
     return `<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${order.issue?.active ? "ring-2 ring-amber-400" : ""}">
-      <div class="flex items-start justify-between gap-4"><div><div class="flex flex-wrap items-center gap-2"><span class="text-2xl font-black text-slate-950">KOT #${escapeHtml(order.kotNumber || order.token)}</span><span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-extrabold text-blue-800">Token #${escapeHtml(order.token)}</span><span class="rounded-full border px-2.5 py-1 text-xs font-extrabold ${urgency.classes}">${urgency.label}</span>${order.issue?.active ? '<span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-900">Attention</span>' : ""}${reward ? '<span class="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-extrabold text-purple-800">Game reward</span>' : ""}</div><p class="mt-1 text-sm font-bold text-blue-700">${escapeHtml(status.label)} · ${escapeHtml(order.serviceMode === "table-service" ? "Table service" : "Self-service")}</p></div><p class="text-right text-xs font-bold text-slate-500">${minutesSince(order.createdAt)} min<br><span class="font-normal">elapsed</span></p></div>
+      <div class="flex items-start justify-between gap-4"><div><div class="flex flex-wrap items-center gap-2"><span class="text-2xl font-black text-slate-950">KOT #${escapeHtml(order.kotNumber || order.token)}</span><span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-extrabold text-blue-800">Token #${escapeHtml(order.token)}</span><span class="rounded-full border px-2.5 py-1 text-xs font-extrabold ${urgency.classes}">${urgency.label}</span>${order.issue?.active ? '<span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-900">Attention</span>' : ""}${reward ? '<span class="rounded-full bg-purple-100 px-2.5 py-1 text-xs font-extrabold text-purple-800">Game reward</span>' : ""}</div><p class="mt-1 text-sm font-bold text-blue-700">${escapeHtml(status.label)} · ${escapeHtml(order.serviceMode === "table-service" ? "Table service" : "Self-service")}</p></div><p class="text-right text-xs font-bold text-slate-500">${timer.minutes} min<br><span class="font-normal">${escapeHtml(timer.label)}</span></p></div>
       <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600"><span class="font-bold capitalize">${escapeHtml(order.orderType)}</span>${order.tableNumber ? `<span>Table ${escapeHtml(order.tableNumber)}</span>` : ""}<span>${itemCount} item${itemCount === 1 ? "" : "s"}</span><span>${formatter.format(order.total)}</span></div>
       ${compact ? "" : `<ul class="mt-4 space-y-1 text-sm text-slate-700">${order.items.slice(0, 3).map((item) => `<li>${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? " · Complimentary" : ""}</li>`).join("")}${order.items.length > 3 ? `<li class="text-slate-500">+${order.items.length - 3} more line items</li>` : ""}</ul>`}
-      <div class="mt-5 flex flex-wrap gap-2"><button type="button" data-open-order="${escapeHtml(order.id)}" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-extrabold text-slate-800 hover:border-blue-700">View details</button>${status.action ? `<button type="button" data-order-action="${escapeHtml(order.id)}" class="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-blue-800">${escapeHtml(status.action)}</button>` : ""}${activeStatuses.includes(order.status) ? `<button type="button" data-request-cancellation="${escapeHtml(order.id)}" class="rounded-xl border border-red-300 px-4 py-2.5 text-sm font-extrabold text-red-700">Cancel</button>` : ""}${session.role === "admin" && order.status === "delivered" ? `<button type="button" data-reopen-order="${escapeHtml(order.id)}" class="rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-extrabold text-amber-800">Reopen</button>` : ""}</div>
+      <div class="mt-5 flex flex-wrap gap-2"><button type="button" data-open-order="${escapeHtml(order.id)}" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-extrabold text-slate-800 hover:border-blue-700">View details</button>${status.action ? `<button type="button" data-order-action="${escapeHtml(order.id)}" data-order-status="${escapeHtml(order.status)}" class="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-blue-800">${escapeHtml(status.action)}</button>` : ""}${activeStatuses.includes(order.status) ? `<button type="button" data-request-cancellation="${escapeHtml(order.id)}" class="rounded-xl border border-red-300 px-4 py-2.5 text-sm font-extrabold text-red-700">Cancel</button>` : ""}${session.role === "admin" && order.status === "delivered" ? `<button type="button" data-reopen-order="${escapeHtml(order.id)}" class="rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-extrabold text-amber-800">Reopen</button>` : ""}</div>
     </article>`;
   }
 
@@ -59,7 +67,8 @@
     const deliveredToday = orders.filter((order) => order.status === "delivered" && todayKey(order.deliveredAt || order.updatedAt) === today);
     const completedDurations = deliveredToday.map((order) => Math.max(0, Math.round((new Date(order.readyAt || order.deliveredAt).getTime() - new Date(order.preparingAt || order.createdAt).getTime()) / 60000))).filter(Number.isFinite);
     const active = orders.filter((order) => activeStatuses.includes(order.status));
-    const delayed = active.filter((order) => order.status !== "ready" && minutesSince(order.createdAt) > Number(order.estimatedMinutes || 10));
+    const restaurant = state.restaurants.find((item) => item.id === restaurantId);
+    const delayed = active.filter((order) => order.status !== "ready" && minutesSince(order.createdAt) >= Number(restaurant?.delayedMinutes || order.estimatedMinutes || 10));
     const items = state.menuItems.filter((item) => item.restaurantId === restaurantId);
     document.querySelector("[data-metric-new]").textContent = String(newCount);
     document.querySelector("[data-metric-preparing]").textContent = String(preparing);
@@ -67,20 +76,21 @@
     document.querySelector("[data-metric-delivered]").textContent = String(deliveredToday.length);
     document.querySelector("[data-metric-average]").textContent = completedDurations.length ? `${Math.round(completedDurations.reduce((sum, value) => sum + value, 0) / completedDurations.length)} min` : "—";
     document.querySelector("[data-metric-delayed]").textContent = String(delayed.length);
-    document.querySelectorAll("[data-low-stock-count]").forEach((element) => { element.textContent = String(items.filter((item) => ["unavailable", "sold-out"].includes(item.availabilityStatus) || item.emergencyCutoff).length); });
+    document.querySelectorAll("[data-low-stock-count]").forEach((element) => { element.textContent = String(items.filter((item) => Number(item.availableQuantity ?? item.stock ?? 0) <= Number(item.lowStockThreshold || 0) || ["unavailable", "sold-out"].includes(item.availabilityStatus) || item.emergencyCutoff).length); });
     document.querySelector("[data-metric-soldout]").textContent = String(items.filter((item) => item.availabilityStatus === "sold-out").length);
   }
 
   function derivedAlerts(state, orders) {
     const stored = state.alerts.filter((alert) => alert.restaurantId === restaurantId && !alert.dismissed);
-    const delayed = orders.filter((order) => activeStatuses.includes(order.status) && order.status !== "ready" && minutesSince(order.createdAt) > Number(order.estimatedMinutes || 10)).map((order) => ({ id: `delayed_${order.id}`, type: "delayed", severity: "warning", message: `Token #${order.token} is delayed`, orderId: order.id, derived: true }));
     const restaurant = state.restaurants.find((item) => item.id === restaurantId);
-    const low = state.menuItems.filter((item) => item.restaurantId === restaurantId && ["limited", "unavailable", "sold-out"].includes(item.availabilityStatus)).map((item) => {
+    const delayed = orders.filter((order) => activeStatuses.includes(order.status) && order.status !== "ready" && minutesSince(order.createdAt) >= Number(restaurant?.delayedMinutes || order.estimatedMinutes || 10)).map((order) => ({ id: `delayed_${order.id}`, type: "delayed", severity: "warning", message: `Token #${order.token} is delayed`, orderId: order.id, derived: true }));
+    const pendingPayments = state.payments.filter((payment) => payment.restaurantId === restaurantId && ["processing", "pending"].includes(payment.status) && Date.now() - new Date(payment.updatedAt || payment.createdAt).getTime() >= 5 * 60000).map((payment) => ({ id: `pending_${payment.id}`, type: "payment_pending", severity: "warning", message: `Payment attempt ${payment.id} has remained ${payment.status} for more than 5 minutes`, derived: true }));
+    const low = state.menuItems.filter((item) => item.restaurantId === restaurantId && (Number(item.availableQuantity ?? item.stock ?? 0) <= Number(item.lowStockThreshold || 0) || ["limited", "unavailable", "sold-out"].includes(item.availabilityStatus))).map((item) => {
       const reward = [restaurant?.primaryRewardItemId, restaurant?.fallbackRewardItemId].includes(item.id);
-      const label = item.availabilityStatus === "limited" ? "has limited availability" : item.availabilityStatus === "sold-out" ? "is sold out today" : "is temporarily unavailable";
+      const label = item.availabilityStatus === "sold-out" ? "is sold out today" : item.availabilityStatus === "unavailable" ? "is temporarily unavailable" : `is low with ${Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0))} sellable`;
       return { id: `availability_${item.id}`, type: reward ? "reward_unavailable" : "item_unavailable", severity: item.availabilityStatus === "limited" ? "warning" : "error", message: `${reward ? "Reward item: " : ""}${item.name} ${label}`, derived: true };
     });
-    return [...stored, ...delayed, ...low];
+    return [...stored, ...delayed, ...pendingPayments, ...low];
   }
 
   function renderAlerts(state, orders) {
@@ -94,14 +104,15 @@
   function renderOperations() {
     const state = global.AutoCodeState.read();
     const orders = restaurantOrders(state);
+    const restaurant = state.restaurants.find((item) => item.id === restaurantId);
     const active = orders.filter((order) => activeStatuses.includes(order.status));
     const dashboard = document.querySelector("[data-dashboard-queue]");
-    dashboard.innerHTML = active.slice(0, 4).map((order) => orderCard(order, true)).join("");
+    dashboard.innerHTML = active.slice(0, 4).map((order) => orderCard(order, true, restaurant)).join("");
     document.querySelector("[data-dashboard-empty]").hidden = active.length > 0;
     const today = todayKey(new Date());
     const filtered = orderFilter === "active" ? active : orders.filter((order) => ["delivered", "cancelled"].includes(order.status) && todayKey(order.updatedAt) === today).reverse();
     const list = document.querySelector("[data-orders-list]");
-    list.innerHTML = filtered.map((order) => orderCard(order, false)).join("");
+    list.innerHTML = filtered.map((order) => orderCard(order, false, restaurant)).join("");
     document.querySelector("[data-orders-empty]").hidden = filtered.length > 0;
     renderMetrics(state, orders);
     renderAlerts(state, orders);
@@ -111,19 +122,28 @@
     return statusDetails[order.status]?.next || null;
   }
 
-  function transitionOrder(orderId) {
+  function transitionOrder(orderId, expectedStatus) {
     try {
       global.AutoCodeState.update((state) => {
         const order = state.orders.find((candidate) => candidate.id === orderId && candidate.restaurantId === restaurantId);
         if (!order) throw new Error("This order no longer exists.");
+        if (expectedStatus && order.status !== expectedStatus) throw new Error("This order changed in another tab. Review its current status before acting.");
         const next = nextStatus(order);
         if (!next) throw new Error("This order has no permitted next action.");
         if (next === "ready") {
+          if (order.issue?.active) throw new Error("Resolve the active operational issue before marking this order Ready.");
           const rewardMissing = order.items.some((item) => item.rewardSource === "tic_tac_toe" && item.fulfillmentExcluded);
           if (rewardMissing) throw new Error("Confirm the complimentary reward before marking this order Ready.");
           if (!global.confirm("Confirm that all purchased and complimentary items are prepared and packaged.")) return;
         }
-        if (next === "delivered" && !global.confirm(`Confirm delivery of token #${order.token}.`)) return;
+        if (next === "delivered") {
+          const expectedReferences = [String(order.token), String(order.tableNumber || "").trim().toLowerCase()].filter(Boolean);
+          const enteredReference = global.prompt(order.tableNumber ? "Enter the token or table number verified at handoff." : "Enter the token verified at pickup.");
+          if (enteredReference === null) return;
+          const normalizedReference = enteredReference.trim().replace(/^#/, "").toLowerCase();
+          if (!expectedReferences.includes(normalizedReference)) throw new Error("The token or table number does not match this order.");
+          if (!global.confirm(`Confirm delivery of token #${order.token}.`)) return;
+        }
         const timestamp = new Date().toISOString();
         const labels = { order_received: "Order accepted", preparing: "Preparation started", ready: "Marked ready", delivered: "Marked delivered" };
         order.status = next;
@@ -160,7 +180,8 @@
     document.querySelector("[data-detail-token]").textContent = `#${order.token} · KOT #${order.kotNumber || order.token}`;
     document.querySelector("[data-detail-meta]").textContent = `${order.customerName} · ${order.orderType} · ${order.serviceMode === "table-service" ? "Table service" : "Self-service"}${order.tableNumber ? ` · Table ${order.tableNumber}` : ""}`;
     document.querySelector("[data-detail-payment]").textContent = `${order.paymentStatus} · ${formatter.format(order.total)}`;
-    document.querySelector("[data-detail-elapsed]").textContent = `${minutesSince(order.createdAt)} minutes`;
+    const timer = phaseTimer(order);
+    document.querySelector("[data-detail-elapsed]").textContent = `${timer.minutes} minutes ${timer.label}`;
     document.querySelector("[data-detail-items]").innerHTML = order.items.map((item) => `<div class="flex justify-between gap-4 py-4"><div><p class="font-extrabold text-slate-900">${item.quantity} × ${escapeHtml(item.name)}${item.rewardSource ? ' <span class="text-purple-700">· Complimentary reward</span>' : ""}</p><p class="mt-1 text-xs text-slate-500">${escapeHtml([item.sizeName, item.spiceLevel, ...(item.addOns || []).map((addOn) => addOn.name)].filter(Boolean).join(" · "))}</p>${item.instructions ? `<p class="mt-1 text-xs italic text-slate-500">“${escapeHtml(item.instructions)}”</p>` : ""}</div><p class="font-bold">${formatter.format(item.lineTotal || 0)}</p></div>`).join("");
     const notes = document.querySelector("[data-detail-notes]");
     notes.hidden = !order.orderNotes && !order.issue?.active;
@@ -168,7 +189,7 @@
     document.querySelector("[data-detail-timeline]").innerHTML = order.timeline.slice().reverse().map((event) => `<li><p class="text-sm font-extrabold text-slate-800">${escapeHtml(event.label)}</p><p class="mt-1 text-xs text-slate-500">${new Date(event.at).toLocaleString()} · ${escapeHtml(event.actorName || event.actor)}</p></li>`).join("");
     document.querySelector("[data-detail-feedback]").hidden = true;
     document.querySelector("[data-resolve-issue]").disabled = !order.issue?.active;
-    document.querySelector("[data-detail-actions]").innerHTML = `<div class="grid gap-3">${status.action ? `<button data-order-action="${escapeHtml(order.id)}" class="w-full rounded-xl bg-blue-700 px-6 py-3.5 font-extrabold text-white">${escapeHtml(status.action)}</button>` : ""}${activeStatuses.includes(order.status) ? `<button data-request-cancellation="${escapeHtml(order.id)}" class="w-full rounded-xl border border-red-300 px-6 py-3.5 font-extrabold text-red-700">Request cancellation</button>` : ""}${session.role === "admin" && order.status === "delivered" ? `<button data-reopen-order="${escapeHtml(order.id)}" class="w-full rounded-xl border border-amber-300 px-6 py-3.5 font-extrabold text-amber-800">Reopen as Ready</button>` : ""}${!status.action && !activeStatuses.includes(order.status) && !(session.role === "admin" && order.status === "delivered") ? `<p class="rounded-xl bg-slate-100 p-4 text-center text-sm font-bold text-slate-600">No further fulfillment action is available.</p>` : ""}</div>`;
+    document.querySelector("[data-detail-actions]").innerHTML = `<div class="grid gap-3">${status.action ? `<button data-order-action="${escapeHtml(order.id)}" data-order-status="${escapeHtml(order.status)}" class="w-full rounded-xl bg-blue-700 px-6 py-3.5 font-extrabold text-white">${escapeHtml(status.action)}</button>` : ""}${activeStatuses.includes(order.status) ? `<button data-request-cancellation="${escapeHtml(order.id)}" class="w-full rounded-xl border border-red-300 px-6 py-3.5 font-extrabold text-red-700">Request cancellation</button>` : ""}${session.role === "admin" && order.status === "delivered" ? `<button data-reopen-order="${escapeHtml(order.id)}" class="w-full rounded-xl border border-amber-300 px-6 py-3.5 font-extrabold text-amber-800">Reopen as Ready</button>` : ""}${!status.action && !activeStatuses.includes(order.status) && !(session.role === "admin" && order.status === "delivered") ? `<p class="rounded-xl bg-slate-100 p-4 text-center text-sm font-bold text-slate-600">No further fulfillment action is available.</p>` : ""}</div>`;
     if (!orderDialog.open) global.AutoCodeApp.openDialog(orderDialog);
   }
 
@@ -206,7 +227,7 @@
     const action = event.target.closest("[data-order-action]");
     const dismiss = event.target.closest("[data-dismiss-alert]");
     if (open) openOrder(open.dataset.openOrder);
-    if (action) transitionOrder(action.dataset.orderAction);
+    if (action) transitionOrder(action.dataset.orderAction, action.dataset.orderStatus);
     if (dismiss) {
       global.AutoCodeState.update((state) => { const alert = state.alerts.find((item) => item.id === dismiss.dataset.dismissAlert); if (alert) alert.dismissed = true; }, "alert-dismissed");
       renderOperations();

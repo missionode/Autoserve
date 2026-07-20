@@ -10,6 +10,8 @@
   const paymentForm = document.querySelector("[data-payment-form]");
   const formatter = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 });
   let checkoutDraft = null;
+  let paymentResolutionTimer = 0;
+  let paymentInFlight = false;
 
   if (!checkoutForm || !paymentDialog || !paymentForm) return;
 
@@ -175,6 +177,9 @@
   }
 
   function openPayment() {
+    global.clearTimeout(paymentResolutionTimer);
+    paymentResolutionTimer = 0;
+    paymentInFlight = false;
     checkoutDraft = validateCheckout();
     paymentForm.reset();
     paymentForm.querySelector('[name="upiMethod"][value="mock-app"]').checked = true;
@@ -184,6 +189,7 @@
     document.querySelector("[data-payment-fields]").hidden = false;
     document.querySelector("[data-pending-resolution]").hidden = true;
     document.querySelector("[data-upi-id-field]").hidden = true;
+    document.querySelector("[data-confirm-payment]").disabled = false;
     global.AutoCodeApp.openDialog(paymentDialog);
   }
 
@@ -238,12 +244,16 @@
       const simulationReadyAt = new Date(new Date(createdAt).getTime() + estimatedMinutes * 5000).toISOString();
       cart.items.forEach((entry) => {
         const item = state.menuItems.find((candidate) => candidate.id === entry.itemId);
-        item.availableQuantity = Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0) - entry.quantity);
+        const previousQuantity = Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0));
+        const previousStock = Math.max(0, Number(item.stock ?? previousQuantity));
+        item.availableQuantity = Math.max(0, previousQuantity - entry.quantity);
+        item.stock = Math.max(0, previousStock - entry.quantity);
         if (item.availableQuantity === 0) {
           item.availabilityStatus = "sold-out";
           item.availabilityNote = "Sold out through customer orders";
         }
         item.updatedAt = createdAt;
+        state.inventoryAudit.push({ id: createId("audit"), restaurantId, itemId: item.id, itemName: item.name, actorId: session.id, actorName: checkoutDraft.customerName, actorRole: session.role, changeType: "paid_order_deduction", previousQuantity, newQuantity: item.availableQuantity, at: createdAt, note: `Token #${String(tokenValue).padStart(3, "0")} · ${entry.quantity} purchased` });
       });
       const kotNumber = String(kotValue).padStart(4, "0");
       const kotSnapshot = { number: kotNumber, tableNumber: checkoutDraft.tableNumber, serviceMode: checkoutDraft.serviceMode, orderType: checkoutDraft.orderType, items: JSON.parse(JSON.stringify(snapshots)), instructions: checkoutDraft.orderNotes, generatedAt: createdAt };
@@ -254,7 +264,7 @@
         state.payments.push(payment);
       }
       state.orders.find((order) => order.id === orderId).paymentId = payment.id;
-      state.orders.find((order) => order.id === orderId).inventoryModel = "availability";
+      state.orders.find((order) => order.id === orderId).inventoryModel = "quantity";
       payment.status = "success";
       payment.orderId = orderId;
       payment.transactionId = transactionId;
@@ -271,12 +281,13 @@
   function renderConfirmation(orderId) {
     const state = global.AutoCodeState.read();
     const order = state.orders.find((candidate) => candidate.id === orderId && candidate.customerId === session.id);
+    const restaurant = state.restaurants.find((candidate) => candidate.id === order?.restaurantId);
     const container = document.querySelector("[data-confirmation-content]");
     if (!order) {
       container.innerHTML = `<div class="app-card p-10 text-center"><h1 class="text-2xl font-black text-red-900">Order confirmation unavailable</h1><a href="#/menu" class="mt-6 inline-flex rounded-xl bg-blue-700 px-5 py-3 font-bold text-white">Return to menu</a></div>`;
       return;
     }
-    container.innerHTML = `<article class="app-card overflow-hidden"><div class="bg-green-700 p-7 text-center text-white sm:p-10"><p class="text-sm font-extrabold uppercase tracking-[0.16em] text-green-100">Payment successful</p><h1 class="mt-3 text-3xl font-black sm:text-4xl">Your order is confirmed</h1><p class="mt-5 text-sm font-bold text-green-100">ORDER TOKEN</p><p class="mt-1 text-7xl font-black tracking-tight">#${escapeHtml(order.token)}</p></div><div class="p-6 sm:p-8"><div class="grid gap-4 sm:grid-cols-3"><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Order type</p><p class="mt-1 font-extrabold capitalize text-slate-900">${escapeHtml(order.orderType)}${order.tableNumber ? ` · ${escapeHtml(order.tableNumber)}` : ""}</p></div><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Amount paid</p><p class="mt-1 font-extrabold text-slate-900">${formatter.format(order.total)}</p></div><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Estimated time</p><p class="mt-1 font-extrabold text-slate-900">${order.estimatedMinutes} minutes</p></div></div><div class="mt-7"><h2 class="text-lg font-black text-slate-950">Order items</h2>${order.items.map((item) => `<div class="mt-3 flex justify-between gap-4 border-b border-slate-100 pb-3"><p class="font-bold text-slate-700">${item.quantity} × ${escapeHtml(item.name)}</p><p class="font-bold text-slate-900">${formatter.format(item.lineTotal)}</p></div>`).join("")}</div><div class="mt-7 rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-950"><strong>Transaction:</strong> ${escapeHtml(order.transactionId)}<br><strong>Status:</strong> Payment confirmed</div><div class="mt-7 flex flex-wrap gap-3"><a href="#/orders" class="rounded-xl bg-blue-700 px-5 py-3 font-extrabold text-white">Track order</a><a href="#/menu" class="rounded-xl border border-slate-300 px-5 py-3 font-extrabold text-slate-800">Order more</a></div></div></article>`;
+    container.innerHTML = `<article class="app-card overflow-hidden"><div class="bg-green-700 p-7 text-center text-white sm:p-10"><p class="text-sm font-extrabold uppercase tracking-[0.16em] text-green-100">Payment successful</p><h1 class="mt-3 text-3xl font-black sm:text-4xl">Your order is confirmed</h1><p class="mt-5 text-sm font-bold text-green-100">ORDER TOKEN</p><p class="mt-1 text-7xl font-black tracking-tight">#${escapeHtml(order.token)}</p><p class="mt-3 text-sm font-bold text-green-100">${escapeHtml(restaurant?.name || "Restaurant")} · Order ${escapeHtml(order.id)}</p></div><div class="p-6 sm:p-8"><div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Order type</p><p class="mt-1 font-extrabold capitalize text-slate-900">${escapeHtml(order.orderType)}${order.tableNumber ? ` · ${escapeHtml(order.tableNumber)}` : ""}</p></div><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Amount paid</p><p class="mt-1 font-extrabold text-slate-900">${formatter.format(order.total)}</p></div><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Order status</p><p class="mt-1 font-extrabold capitalize text-slate-900">${escapeHtml(order.status.replaceAll("_", " "))}</p></div><div class="rounded-xl bg-slate-100 p-4"><p class="text-xs font-bold text-slate-500">Estimated time</p><p class="mt-1 font-extrabold text-slate-900">${order.estimatedMinutes} minutes</p></div></div><div class="mt-7"><h2 class="text-lg font-black text-slate-950">Order items</h2>${order.items.map((item) => { const customizations = [item.sizeName, item.spiceLevel, ...(item.addOns || []).map((option) => option.name), item.instructions].filter(Boolean).join(" · "); return `<div class="mt-3 flex justify-between gap-4 border-b border-slate-100 pb-3"><div><p class="font-bold text-slate-700">${item.quantity} × ${escapeHtml(item.name)}</p>${customizations ? `<p class="mt-1 text-xs text-slate-500">${escapeHtml(customizations)}</p>` : ""}</div><p class="font-bold text-slate-900">${formatter.format(item.lineTotal)}</p></div>`; }).join("")}</div><div class="mt-7 rounded-xl bg-blue-50 p-4 text-sm leading-6 text-blue-950"><strong>Payment:</strong> Confirmed<br><strong>Transaction:</strong> ${escapeHtml(order.transactionId)}<br><strong>Service:</strong> ${escapeHtml(order.serviceMode === "table-service" ? "Table service" : "Self-service pickup")}</div><div class="mt-7 flex flex-wrap gap-3"><a href="#/orders" class="rounded-xl bg-blue-700 px-5 py-3 font-extrabold text-white">Track order</a><a href="#/menu" class="rounded-xl border border-slate-300 px-5 py-3 font-extrabold text-slate-800">Order more</a></div></div></article>`;
   }
 
   function resolveOutcome(outcome, methodData) {
@@ -315,15 +326,33 @@
     }
   }
 
+  function beginPayment(methodData) {
+    if (paymentInFlight) return;
+    paymentInFlight = true;
+    const button = document.querySelector("[data-confirm-payment]");
+    button.disabled = true;
+    recordNonSuccess("processing", methodData);
+    setPaymentFeedback("Processing the simulated UPI provider response…", "success");
+    paymentResolutionTimer = global.setTimeout(() => {
+      paymentResolutionTimer = 0;
+      paymentInFlight = false;
+      resolveOutcome(methodData.outcome, methodData);
+    }, 450);
+  }
+
   checkoutForm.addEventListener("change", (event) => { if (event.target.name === "orderType") toggleOrderType(); });
   checkoutForm.addEventListener("submit", (event) => { event.preventDefault(); try { openPayment(); } catch (error) { setCheckoutFeedback(error.message, true); } });
   paymentForm.addEventListener("change", (event) => { if (event.target.name === "upiMethod") document.querySelector("[data-upi-id-field]").hidden = event.target.value !== "upi-id"; });
-  paymentForm.addEventListener("submit", (event) => { event.preventDefault(); try { const methodData = paymentMethodData(); resolveOutcome(methodData.outcome, methodData); } catch (error) { setPaymentFeedback(error.message, "error"); } });
+  paymentForm.addEventListener("submit", (event) => { event.preventDefault(); try { beginPayment(paymentMethodData()); } catch (error) { setPaymentFeedback(error.message, "error"); } });
   document.querySelector("[data-close-payment]").addEventListener("click", () => {
+    global.clearTimeout(paymentResolutionTimer);
+    paymentResolutionTimer = 0;
+    paymentInFlight = false;
     if (checkoutDraft) {
       const data = new FormData(paymentForm);
       recordNonSuccess("cancelled", { method: String(data.get("upiMethod") || "mock-app"), upiId: String(data.get("upiId") || "").trim() || null });
     }
+    document.querySelector("[data-confirm-payment]").disabled = false;
     global.AutoCodeApp.closeDialog(paymentDialog, "cancelled");
     setCheckoutFeedback("Payment was cancelled. Your order has been preserved.", true);
   });

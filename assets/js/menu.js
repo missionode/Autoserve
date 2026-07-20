@@ -177,6 +177,10 @@
       global.AutoCodeState.update((state) => {
         const item = state.menuItems.find((candidate) => candidate.id === selectedItemId && candidate.restaurantId === restaurantId);
         if (!item || !isAvailable(item)) throw new Error("This item is no longer available.");
+        const validSize = (item.sizes || [{ id: "regular" }]).some((option) => option.id === sizeId);
+        const validAddOns = addOnIds.every((id) => (item.addOns || []).some((option) => option.id === id));
+        const validSpice = !spiceLevel || (item.spiceLevels || []).includes(spiceLevel);
+        if (!validSize || !validAddOns || !validSpice) throw new Error("This item's options changed. Review your selections and try again.");
         const cart = ensureCart(state);
         const existingQuantity = cartQuantityForItem(cart, item.id);
         if (existingQuantity + quantity > availableQuantity(item)) throw new Error(`Only ${availableQuantity(item)} ${item.name} available.`);
@@ -283,8 +287,15 @@
         const entry = cart?.items.find((candidate) => candidate.id === entryId);
         if (!entry) return;
         const item = state.menuItems.find((candidate) => candidate.id === entry.itemId);
-        entry.quantity += direction;
-        if (entry.quantity <= 0) cart.items = cart.items.filter((candidate) => candidate.id !== entryId);
+        if (entry.comboInstance) throw new Error("Combo quantities cannot be changed one item at a time. Add or remove the complete combo.");
+        const nextQuantity = entry.quantity + direction;
+        if (nextQuantity > entry.quantity) {
+          if (!item || !isAvailable(item)) throw new Error((item?.name || "This item") + " is no longer available.");
+          const otherQuantity = cartQuantityForItem(cart, entry.itemId) - entry.quantity;
+          if (otherQuantity + nextQuantity > availableQuantity(item)) throw new Error("Only " + availableQuantity(item) + " " + item.name + " available.");
+        }
+        entry.quantity = nextQuantity;
+        if (nextQuantity <= 0) cart.items = cart.items.filter((candidate) => candidate.id !== entryId);
         cart.updatedAt = new Date().toISOString();
       }, "cart-quantity-changed");
       cartFeedback.hidden = true;
@@ -298,7 +309,10 @@
     global.AutoCodeState.update((state) => {
       const cart = currentCart(state);
       if (!cart) return;
-      cart.items = cart.items.filter((entry) => entry.id !== entryId);
+      const selected = cart.items.find((entry) => entry.id === entryId);
+      cart.items = selected?.comboInstance
+        ? cart.items.filter((entry) => entry.comboInstance !== selected.comboInstance)
+        : cart.items.filter((entry) => entry.id !== entryId);
       cart.updatedAt = new Date().toISOString();
     }, "cart-item-removed");
     cartFeedback.hidden = true;

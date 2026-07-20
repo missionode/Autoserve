@@ -2,13 +2,18 @@
   "use strict";
 
   const STORAGE_KEY = "autocode.prototype.state";
-  const SCHEMA_VERSION = 15;
+  const SCHEMA_VERSION = 19;
   const listeners = new Set();
 
   const now = () => new Date().toISOString();
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const createAdministrativeToken = () => String(Math.floor(100000 + Math.random() * 900000));
   const nextLocalMidnight = () => { const date = new Date(); date.setHours(24, 0, 0, 0); return date.toISOString(); };
+  const subscriptionPlans = () => [
+    { id: "plan_starter", name: "Starter", monthlyPrice: 999, features: ["Digital menu and QR ordering", "Up to 5 Staff accounts", "Order and availability management"], staffLimit: 5, active: true, sortOrder: 1 },
+    { id: "plan_growth", name: "Growth", monthlyPrice: 1999, features: ["Everything in Starter", "Unlimited Staff accounts", "Reports, combos, and branded QR cards"], staffLimit: null, active: true, recommended: true, sortOrder: 2 },
+    { id: "plan_scale", name: "Scale", monthlyPrice: 3499, features: ["Everything in Growth", "Priority Support", "Advanced platform and data tools"], staffLimit: null, active: true, sortOrder: 3 }
+  ];
 
   function sampleHistory() {
     const start = new Date(); start.setHours(0, 1, 0, 0);
@@ -80,6 +85,7 @@
           lowStockDefault: 5,
           primaryRewardItemId: "item_cold_coffee",
           fallbackRewardItemId: "item_fries",
+          subscription: { planId: "plan_growth", planName: "Growth", status: "active", billingCycle: "monthly", startedAt: createdAt, currentPeriodStart: createdAt, currentPeriodEnd: new Date(new Date(createdAt).setMonth(new Date(createdAt).getMonth() + 1)).toISOString(), autoRenew: true, mandateMode: "prototype", mandateStatus: "active", providerMandateReference: "SIM-MANDATE-DEMO-100", payerReferenceMasked: "demo***@upi", mandateAuthorizedAt: createdAt, nextDebitAt: new Date(new Date(createdAt).setMonth(new Date(createdAt).getMonth() + 1)).toISOString(), lastPaymentId: "subscription_payment_demo" },
           createdAt,
           updatedAt: createdAt
         }
@@ -155,6 +161,7 @@
           price: 189,
           dietary: "vegetarian",
           stock: 18,
+          availableQuantity: 18,
           lowStockThreshold: 5,
           status: "published",
           availabilityStatus: "available",
@@ -182,6 +189,7 @@
           price: 99,
           dietary: "vegetarian",
           stock: 24,
+          availableQuantity: 24,
           lowStockThreshold: 6,
           status: "published",
           availabilityStatus: "available",
@@ -209,6 +217,7 @@
           price: 129,
           dietary: "vegetarian",
           stock: 15,
+          availableQuantity: 15,
           lowStockThreshold: 5,
           status: "published",
           availabilityStatus: "available",
@@ -237,6 +246,7 @@
           price: 119,
           dietary: "vegetarian",
           stock: 8,
+          availableQuantity: 8,
           lowStockThreshold: 3,
           status: "published",
           availabilityStatus: "available",
@@ -260,7 +270,9 @@
       authorizationAttempts: samples.authorizationAttempts,
       backups: [],
       alerts: [],
-      supportTickets: sampleSupportTickets()
+      supportTickets: sampleSupportTickets(),
+      platformSettings: { subscriptionCurrency: "INR", subscriptionUpiId: "billing@autoserve", subscriptionPlans: subscriptionPlans(), updatedAt: createdAt },
+      subscriptionPayments: [{ id: "subscription_payment_demo", restaurantId: "rest_autoserve_demo", planId: "plan_growth", planName: "Growth", priceSnapshot: { monthlyPrice: 1999, features: ["Everything in Starter", "Unlimited Staff accounts", "Reports, combos, and branded QR cards"] }, amount: 1999, currency: "INR", method: "upi_autopay_simulation", eventType: "initial_payment", payerReferenceMasked: "demo***@upi", providerMandateReference: "SIM-MANDATE-DEMO-100", status: "success", transactionId: "SUB-UPI-DEMO-100", periodStart: createdAt, periodEnd: new Date(new Date(createdAt).setMonth(new Date(createdAt).getMonth() + 1)).toISOString(), paidAt: createdAt, createdAt }]
     };
   }
 
@@ -387,6 +399,56 @@
       state.supportTickets ||= [];
       if (!state.supportTickets.length) state.supportTickets.push(...sampleSupportTickets());
       state.schemaVersion = 15;
+    }
+    if (state.schemaVersion === 15) {
+      const createdAt = now();
+      state.platformSettings ||= { subscriptionCurrency: "INR", subscriptionUpiId: "billing@autoserve", subscriptionPlans: subscriptionPlans(), updatedAt: createdAt };
+      state.platformSettings.subscriptionPlans ||= subscriptionPlans();
+      state.subscriptionPayments ||= [];
+      state.restaurants.forEach((restaurant) => { restaurant.subscription ||= { planId: null, status: "inactive", billingCycle: "monthly", autoRenew: false, createdAt }; });
+      state.schemaVersion = 16;
+    }
+    if (state.schemaVersion === 16) {
+      state.menuItems.forEach((item) => {
+        item.availableQuantity = Math.max(0, Number(item.availableQuantity ?? item.stock ?? 0));
+        item.stock = Math.max(item.availableQuantity, Math.max(0, Number(item.stock ?? item.availableQuantity ?? 0)));
+        if (item.status === "sold-out") {
+          item.status = "published";
+          item.availabilityStatus = "sold-out";
+          item.availableQuantity = 0;
+        }
+        item.availabilityStatus ||= item.availableQuantity > 0 ? "available" : "sold-out";
+      });
+      state.schemaVersion = 17;
+    }
+    if (state.schemaVersion === 17) {
+      const activePaidStatuses = ["payment_confirmed", "order_received", "preparing", "ready"];
+      state.orders.forEach((order) => {
+        if (order.inventoryModel === "availability" && order.paymentStatus === "success" && activePaidStatuses.includes(order.status)) order.inventoryModel = "quantity";
+      });
+      state.schemaVersion = 18;
+    }
+    if (state.schemaVersion === 18) {
+      state.restaurants.forEach((restaurant) => {
+        const subscription = restaurant.subscription ||= { planId: null, status: "inactive", billingCycle: "monthly", autoRenew: false };
+        subscription.mandateMode ||= "prototype";
+        subscription.mandateStatus ||= subscription.status === "active" && subscription.autoRenew ? "active" : "inactive";
+        subscription.providerMandateReference ||= subscription.mandateStatus === "active" ? `SIM-MANDATE-${restaurant.id}` : null;
+        subscription.payerReferenceMasked ||= subscription.mandateStatus === "active" ? "demo***@upi" : null;
+        subscription.mandateAuthorizedAt ||= subscription.mandateStatus === "active" ? subscription.startedAt || subscription.currentPeriodStart || now() : null;
+        subscription.nextDebitAt ||= subscription.mandateStatus === "active" ? subscription.currentPeriodEnd || null : null;
+      });
+      state.subscriptionPayments ||= [];
+      state.subscriptionPayments.forEach((payment) => {
+        const plan = state.platformSettings?.subscriptionPlans?.find((entry) => entry.id === payment.planId);
+        payment.priceSnapshot ||= { monthlyPrice: Number(payment.amount || plan?.monthlyPrice || 0), features: [...(plan?.features || [])] };
+        payment.method = payment.method === "upi" ? "upi_autopay_simulation" : payment.method;
+        payment.eventType ||= "initial_payment";
+        payment.payerReferenceMasked ||= payment.upiId ? `${String(payment.upiId).slice(0, 2)}***@${String(payment.upiId).split("@")[1] || "upi"}` : "demo***@upi";
+        delete payment.upiId;
+        payment.providerMandateReference ||= state.restaurants.find((restaurant) => restaurant.id === payment.restaurantId)?.subscription?.providerMandateReference || null;
+      });
+      state.schemaVersion = 19;
     }
     if (state.schemaVersion < SCHEMA_VERSION) throw new Error("No migration is available for this prototype data.");
     return state;

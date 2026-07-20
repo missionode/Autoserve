@@ -184,7 +184,7 @@
         setFeedback("Enter the email, mobile number, or Staff ID associated with the prototype account.", "error");
         return;
       }
-      setFeedback("Prototype recovery simulated. Use the seeded credentials in authentication.md to continue.", "success");
+      setFeedback("Prototype recovery simulated. Use the seeded credentials in docs/authentication.md to continue.", "success");
     });
   }
 

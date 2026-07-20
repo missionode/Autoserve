@@ -14,6 +14,8 @@ The seeded customer can place orders, track active orders, view history, submit 
 
 Customer login and registration also provide a simulated **Continue with Google** flow. It creates or reuses `google.customer@autoserve.demo`, preserves an active guest order, and does not contact Google or request real account data.
 
+Password fields include an accessible show/hide control. Account creation and password replacement require matching confirmation. Password creation also provides strength guidance and an optional browser-generated strong password. PIN creation/replacement requires matching PIN confirmation but does not use the general password generator.
+
 ## Restaurant Admin
 
 - **Username / email:** `admin@autoserve.demo`

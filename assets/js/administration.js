@@ -104,7 +104,7 @@
   function openInventory(itemId) {
     const item = itemsFor(global.AutoCodeState.read()).find((entry) => entry.id === itemId);
     if (!item) return;
-    selectedInventory = { id: item.id, stock: item.stock, updatedAt: item.updatedAt };
+    selectedInventory = { id: item.id, stock: item.stock, availableQuantity: item.availableQuantity, updatedAt: item.updatedAt };
     inventoryForm.reset();
     inventoryForm.elements.quantity.value = "1";
     document.querySelector("[data-inventory-item-name]").textContent = item.name;
@@ -126,8 +126,8 @@
       global.AutoCodeState.update((state) => {
         const item = itemsFor(state).find((entry) => entry.id === selectedInventory?.id);
         if (!item) throw new Error("This inventory item no longer exists.");
-        if (item.stock !== selectedInventory.stock || item.updatedAt !== selectedInventory.updatedAt) {
-          selectedInventory = { id: item.id, stock: item.stock, updatedAt: item.updatedAt };
+        if (item.stock !== selectedInventory.stock || item.availableQuantity !== selectedInventory.availableQuantity || item.updatedAt !== selectedInventory.updatedAt) {
+          selectedInventory = { id: item.id, stock: item.stock, availableQuantity: item.availableQuantity, updatedAt: item.updatedAt };
           document.querySelector("[data-inventory-current]").textContent = `${item.stock} units now recorded. Review this newer value and submit again.`;
           throw new Error(`Another tab changed ${item.name} to ${item.stock}. Review the latest value and resubmit.`);
         }
@@ -135,8 +135,15 @@
         const next = mode === "increase" ? previous + quantity : mode === "decrease" ? previous - quantity : quantity;
         if (next < 0) throw new Error(`Stock cannot fall below zero. ${item.name} currently has ${previous}.`);
         item.stock = next;
-        if (next === 0 && item.status === "published") item.status = "sold-out";
-        if (next > 0 && item.status === "sold-out") item.status = "published";
+        item.availableQuantity = next;
+        if (item.status === "sold-out") item.status = "published";
+        if (next === 0) {
+          item.availabilityStatus = "sold-out";
+          item.availabilityNote = reason || "No sellable quantity remains";
+        } else if (!item.emergencyCutoff && !["draft", "hidden", "archived"].includes(item.status)) {
+          item.availabilityStatus = next <= Number(item.lowStockThreshold || 0) ? "limited" : "available";
+          item.availabilityNote = "";
+        }
         item.updatedAt = now();
         item.lastUpdatedBy = session.id;
         item.lastUpdatedByName = session.name;
@@ -144,7 +151,7 @@
       }, "inventory-adjusted");
       global.AutoCodeApp.closeDialog(inventoryDialog, "saved");
       selectedInventory = null;
-      renderInventory();
+      renderAll();
     } catch (error) { feedback(result, error.message, true); }
   }
 
@@ -154,19 +161,31 @@
     if (!current) return;
     const reason = current.emergencyCutoff ? "Emergency resolved" : global.prompt(`Reason for stopping sales of ${current.name}:`, "Equipment or ingredient issue");
     if (!current.emergencyCutoff && !String(reason || "").trim()) return;
-    global.AutoCodeState.update((nextState) => {
-      const item = itemsFor(nextState).find((entry) => entry.id === itemId);
-      const enabling = !item.emergencyCutoff;
-      item.emergencyCutoff = enabling;
-      item.emergencyCutoffReason = enabling ? String(reason).trim() : "";
-      item.emergencyCutoffAt = enabling ? now() : null;
-      item.emergencyCutoffBy = enabling ? session.id : null;
-      item.updatedAt = now();
-      item.lastUpdatedBy = session.id;
-      item.lastUpdatedByName = session.name;
-      audit(nextState, item, enabling ? "emergency_cutoff_on" : "emergency_cutoff_off", item.stock, item.stock, reason);
-    }, "inventory-cutoff-changed");
-    renderInventory();
+    try {
+      global.AutoCodeState.update((nextState) => {
+        const item = itemsFor(nextState).find((entry) => entry.id === itemId);
+        if (!item) throw new Error("This inventory item no longer exists.");
+        if (item.updatedAt !== current.updatedAt || item.emergencyCutoff !== current.emergencyCutoff) throw new Error(`Another tab changed ${item.name}. Review the latest state before updating the cutoff.`);
+        const enabling = !item.emergencyCutoff;
+        item.emergencyCutoff = enabling;
+        item.emergencyCutoffReason = enabling ? String(reason).trim() : "";
+        item.emergencyCutoffAt = enabling ? now() : null;
+        item.emergencyCutoffBy = enabling ? session.id : null;
+        if (!enabling && item.status === "published") {
+          const quantity = Math.max(0, Number(item.stock || 0));
+          item.availableQuantity = quantity;
+          item.availabilityStatus = quantity === 0 ? "sold-out" : quantity <= Number(item.lowStockThreshold || 0) ? "limited" : "available";
+          item.availabilityNote = quantity === 0 ? "No sellable quantity remains" : "";
+        }
+        item.updatedAt = now();
+        item.lastUpdatedBy = session.id;
+        item.lastUpdatedByName = session.name;
+        audit(nextState, item, enabling ? "emergency_cutoff_on" : "emergency_cutoff_off", item.stock, item.stock, reason);
+      }, "inventory-cutoff-changed");
+      renderAll();
+    } catch (error) {
+      global.alert(error.message);
+    }
   }
 
   function parsePricedOptions(value, label, priceKey) {
@@ -199,7 +218,7 @@
     if (session.role !== "admin" || !menuDialog || !menuForm) return;
     const source = itemsFor(global.AutoCodeState.read()).find((item) => item.id === itemId);
     selectedMenuId = duplicate ? null : source?.id || null;
-    selectedMenuVersion = duplicate || !source ? null : { stock: source.stock, updatedAt: source.updatedAt };
+    selectedMenuVersion = duplicate || !source ? null : { stock: source.stock, availableQuantity: source.availableQuantity, updatedAt: source.updatedAt };
     menuForm.reset();
     fillCategorySelect(source?.categoryId);
     document.querySelector("[data-menu-editor-title]").textContent = duplicate ? `Duplicate ${source.name}` : source ? `Edit ${source.name}` : "Create item";
@@ -257,13 +276,13 @@
       if (!name || !description) throw new Error("Name and description are required.");
       if (!Number.isFinite(price) || price < 0) throw new Error("Base price cannot be negative.");
       if (![stock, threshold, preparationMinutes].every(Number.isInteger) || stock < 0 || threshold < 0 || preparationMinutes < 1) throw new Error("Stock and thresholds must be non-negative whole numbers; preparation time must be at least one minute.");
-      if (status === "published" && (!data.get("categoryId") || (!icon && !imageUrl))) throw new Error("Published items require a category and an image or illustration emoji.");
+      if (status === "published" && (!data.get("categoryId") || !imageUrl)) throw new Error("Published items require a category and a food image.");
       const sizes = parsePricedOptions(data.get("sizes"), "Size", "priceAdjustment");
       const addOns = parsePricedOptions(data.get("addOns"), "Add-on", "price");
       if (!sizes.length) throw new Error("Add at least one size.");
       global.AutoCodeState.update((state) => {
         let item = itemsFor(state).find((entry) => entry.id === selectedMenuId);
-        if (item && selectedMenuVersion && (item.stock !== selectedMenuVersion.stock || item.updatedAt !== selectedMenuVersion.updatedAt)) {
+        if (item && selectedMenuVersion && (item.stock !== selectedMenuVersion.stock || item.availableQuantity !== selectedMenuVersion.availableQuantity || item.updatedAt !== selectedMenuVersion.updatedAt)) {
           throw new Error(`Another tab updated ${item.name}. Close this editor, review the latest values, and try again.`);
         }
         const previousStock = item?.stock ?? stock;
@@ -271,7 +290,10 @@
           item = { id: createId("item"), restaurantId, emergencyCutoff: false, createdAt: now() };
           state.menuItems.push(item);
         }
-        Object.assign(item, { categoryId: String(data.get("categoryId")), name, description, price, dietary: String(data.get("dietary")), stock, lowStockThreshold: threshold, status: stock === 0 && status === "published" ? "sold-out" : status, preparationMinutes, icon: icon || "🍽️", imagePath: imageUrl || null, imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl : "", sizes, spiceLevels: parseNames(data.get("spiceLevels"), "Spice level"), addOns, updatedAt: now(), lastUpdatedBy: session.id, lastUpdatedByName: session.name });
+        const category = categoriesFor(state).find((entry) => entry.id === String(data.get("categoryId")) && entry.status !== "archived");
+        if (!category) throw new Error("Choose an active category.");
+        const publishingStatus = status === "sold-out" ? "published" : status;
+        Object.assign(item, { categoryId: category.id, name, description, price, dietary: String(data.get("dietary")), stock, availableQuantity: status === "sold-out" ? 0 : stock, lowStockThreshold: threshold, status: publishingStatus, availabilityStatus: status === "sold-out" || stock === 0 ? "sold-out" : stock <= threshold ? "limited" : "available", availabilityNote: status === "sold-out" || stock === 0 ? "Marked sold out in menu administration" : "", preparationMinutes, icon: icon || "🍽️", imagePath: imageUrl || null, imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl : "", sizes, spiceLevels: parseNames(data.get("spiceLevels"), "Spice level"), addOns, updatedAt: now(), lastUpdatedBy: session.id, lastUpdatedByName: session.name });
         if (previousStock !== stock) audit(state, item, selectedMenuId ? "menu_stock_update" : "initial_stock", previousStock, stock, "Menu editor");
       }, selectedMenuId ? "menu-item-updated" : "menu-item-created");
       global.AutoCodeApp.closeDialog(menuDialog, "saved");
@@ -285,8 +307,11 @@
     global.AutoCodeState.update((state) => {
       const item = itemsFor(state).find((entry) => entry.id === itemId);
       if (!item) return;
-      if (status === "published" && (!item.name || !item.categoryId || (!item.icon && !item.imagePath && !item.imageUrl))) throw new Error("Complete the name, category, and image before publishing.");
-      item.status = status === "published" && item.stock === 0 ? "sold-out" : status;
+      if (status === "published" && (!item.name || !item.categoryId || (!item.imagePath && !item.imageUrl))) throw new Error("Complete the name, category, and food image before publishing.");
+      item.status = status;
+      if (status === "published") {
+        item.availabilityStatus = Number(item.availableQuantity ?? item.stock ?? 0) > 0 ? "available" : "sold-out";
+      }
       item.updatedAt = now();
       item.lastUpdatedBy = session.id;
       item.lastUpdatedByName = session.name;
@@ -297,9 +322,14 @@
   function renderMenuAdmin() {
     if (session.role !== "admin" || !menuForm) return;
     const state = global.AutoCodeState.read();
-    const items = itemsFor(state).filter((item) => (menuFilter === "all" || item.status === menuFilter) && `${item.name} ${item.description}`.toLowerCase().includes(menuSearch)).sort((a, b) => a.name.localeCompare(b.name));
+    const items = itemsFor(state).filter((item) => (menuFilter === "all" || (menuFilter === "sold-out" ? item.availabilityStatus === "sold-out" : item.status === menuFilter)) && `${item.name} ${item.description}`.toLowerCase().includes(menuSearch)).sort((a, b) => a.name.localeCompare(b.name));
     document.querySelector("[data-admin-menu-empty]").hidden = items.length > 0;
     document.querySelector("[data-admin-menu-list]").innerHTML = items.map((item) => `<article class="rounded-2xl border border-slate-200 p-4"><div class="flex items-start justify-between gap-3"><div class="flex gap-3"><span class="text-3xl">${escapeHtml(item.icon || "🍽️")}</span><div><h3 class="font-black text-slate-950">${escapeHtml(item.name)}</h3><p class="mt-1 text-xs font-bold text-slate-500">${escapeHtml(categoryName(state, item.categoryId))} · ${formatter.format(item.price)} · ${item.stock} in stock</p></div></div><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-extrabold capitalize text-slate-700">${escapeHtml(item.status.replace("-", " "))}</span></div><div class="mt-4 flex flex-wrap gap-2"><button data-edit-menu="${escapeHtml(item.id)}" class="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white">Edit & preview</button><button data-duplicate-menu="${escapeHtml(item.id)}" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold">Duplicate</button>${item.status === "draft" ? `<button data-menu-status="published" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-green-300 px-3 py-2 text-xs font-bold text-green-800">Publish</button>` : ""}${["published", "sold-out"].includes(item.status) ? `<button data-menu-status="hidden" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800">Hide</button>` : ""}${item.status === "hidden" ? `<button data-menu-status="published" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-green-300 px-3 py-2 text-xs font-bold text-green-800">Publish</button>` : ""}${item.status !== "archived" ? `<button data-menu-status="archived" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-red-300 px-3 py-2 text-xs font-bold text-red-700">Archive</button>` : `<button data-menu-status="draft" data-menu-id="${escapeHtml(item.id)}" class="rounded-lg border border-blue-300 px-3 py-2 text-xs font-bold text-blue-700">Restore draft</button>`}</div></article>`).join("");
+    items.forEach((item, index) => {
+      if (item.status !== "published" || item.availabilityStatus !== "sold-out") return;
+      const badge = document.querySelector("[data-admin-menu-list]")?.children[index]?.querySelector(".capitalize");
+      if (badge) badge.textContent = "Sold out";
+    });
     hydrateFoodImages(document.querySelector("[data-admin-menu-list]"), items);
     renderCategories(state);
   }
@@ -373,7 +403,10 @@
     renderAll();
   }
 
-  function renderAll() { renderInventory(); renderMenuAdmin(); }
+  function renderAll() {
+    renderAudit(global.AutoCodeState.read());
+    renderMenuAdmin();
+  }
 
   document.addEventListener("click", (event) => {
     const target = event.target.closest("button");
@@ -392,7 +425,6 @@
     if (target.dataset.archiveCategory) archiveCategory(target.dataset.archiveCategory);
     if (target.dataset.categoryMove) moveCategory(target.dataset.categoryId, target.dataset.categoryMove);
   });
-  document.querySelector("[data-inventory-filter]")?.addEventListener("change", (event) => { inventoryFilter = event.target.value; renderInventory(); });
   inventoryForm.addEventListener("submit", (event) => { event.preventDefault(); saveInventory(); });
   menuForm?.addEventListener("submit", (event) => { event.preventDefault(); saveMenu(); });
   menuForm?.addEventListener("input", updatePreview);
