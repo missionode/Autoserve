@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { loadServerEnvironment } from '@autoserve/configuration';
 import { createLogger } from '@autoserve/observability';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module.js';
 
 const environment = loadServerEnvironment(process.env);
 const logger = createLogger('api', environment.LOG_LEVEL);

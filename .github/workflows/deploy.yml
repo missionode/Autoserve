@@ -1,10 +1,21 @@
 name: Deploy
-on: { workflow_dispatch: { inputs: { environment: { type: choice, options: [development, staging, production], required: true }, image_digest: { required: true } } } }
+on:
+  {
+    workflow_dispatch:
+      {
+        inputs:
+          {
+            environment:
+              { type: choice, options: [development, staging, production], required: true },
+            image_digest: { required: true },
+          },
+      },
+  }
 permissions: { contents: read, id-token: write }
-concurrency: { group: "deploy-${{ inputs.environment }}", cancel-in-progress: false }
+concurrency: { group: 'deploy-${{ inputs.environment }}', cancel-in-progress: false }
 jobs:
   deploy:
-    environment: "${{ inputs.environment }}"
+    environment: '${{ inputs.environment }}'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

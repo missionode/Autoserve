@@ -2,6 +2,7 @@ node_modules/
 .next/
 dist/
 coverage/
+.cache/
 .env
 .env.*
 !.env.example
@@ -9,4 +10,5 @@ coverage/
 *.tfstate.*
 .terraform/
 *.log
+*.tsbuildinfo
 .DS_Store

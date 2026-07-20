@@ -20,5 +20,7 @@ const publicSchema = z.object({ NEXT_PUBLIC_API_ORIGIN: z.string().url() });
 
 export type ServerEnvironment = z.infer<typeof serverSchema>;
 export type PublicEnvironment = z.infer<typeof publicSchema>;
-export const loadServerEnvironment = (source: NodeJS.ProcessEnv): ServerEnvironment => serverSchema.parse(source);
-export const loadPublicEnvironment = (source: NodeJS.ProcessEnv): PublicEnvironment => publicSchema.parse(source);
+export const loadServerEnvironment = (source: NodeJS.ProcessEnv): ServerEnvironment =>
+  serverSchema.parse(source);
+export const loadPublicEnvironment = (source: NodeJS.ProcessEnv): PublicEnvironment =>
+  publicSchema.parse(source);

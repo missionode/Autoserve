@@ -1,1 +1,8 @@
-{"request":{"method":"GET","url":"/health"},"response":{"status":200,"jsonBody":{"service":"provider-stub","status":"ok"},"headers":{"Content-Type":"application/json"}}}
+{
+  "request": { "method": "GET", "url": "/health" },
+  "response": {
+    "status": 200,
+    "jsonBody": { "service": "provider-stub", "status": "ok" },
+    "headers": { "Content-Type": "application/json" }
+  }
+}

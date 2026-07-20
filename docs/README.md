@@ -45,7 +45,7 @@ The completed Stage 3.11 virtual engineering run and its journey-by-journey evid
 
 The final theme, requirements, seed-data, limitation, and freeze-readiness review is documented in `audit/final-prototype-review.md`. The prototype freeze is stakeholder-approved and Complete.
 
-Production execution is tracked separately in Phase 4 of `worksheet.md`. Stage 4.0 Decisions and Governance is the next step; no production implementation item is currently marked complete.
+Production execution is tracked separately in Phase 4 of `worksheet.md`. Stage 4.0 is complete, and Stage 4.1 Engineering and Environment Foundation is in progress.
 
 Stage 4.0 owners, proposed baselines, open decisions, provider/policy gates, risks, ADR queue, and approval records are maintained in `production-decisions.md`.
 
@@ -55,12 +55,16 @@ Stakeholder decisions are grouped into reviewable scope/architecture, identity/d
 
 Cashfree-first payment and UPI AutoPay evaluation requirements, evidence, scorecard, sandbox scenarios, and selection gate are documented in `development/provider-due-diligence.md`; no provider is selected yet.
 
-Remaining exact Stage 4.0 internal policies and their provider/legal exceptions are consolidated for accountable-owner ratification in `development/stage-4.0-policy-resolution.md`.
+The ratified exact Stage 4.0 internal policies and their provider/legal exceptions are recorded in `development/stage-4.0-policy-resolution.md`.
+
+Stage 4.1 local verification, remaining cloud evidence, engineering rules, and incident-development rules are recorded in `development/stage-4.1-verification.md`, `development/engineering-standards.md`, and `development/incident-development.md`.
 
 ## Verification
 
 ```sh
 node --test tests/*.test.js
+npm run verify
+npm run test:failure-gates
 ```
 
 The prototype is intentionally client-side. Authentication, authorization secrets, payments, refunds, notifications, camera scanning, and persistence are simulations and must not be treated as production security or infrastructure. Restaurant subscription billing does not create a real UPI mandate; production must integrate UPI AutoPay through an approved payment provider and process mandate/payment callbacks server-side.

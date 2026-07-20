@@ -11,6 +11,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
+      - run: npm run generate -w @autoserve/database
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -31,15 +32,16 @@ jobs:
       postgres:
         image: postgres:17.5-alpine
         env: { POSTGRES_DB: autoserve, POSTGRES_USER: autoserve, POSTGRES_PASSWORD: autoserve_ci }
-        ports: ["5432:5432"]
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U autoserve" --health-interval 5s --health-timeout 5s --health-retries 10
-    env: { DATABASE_URL: "postgresql://autoserve:autoserve_ci@localhost:5432/autoserve" }
+    env: { DATABASE_URL: 'postgresql://autoserve:autoserve_ci@localhost:5432/autoserve' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci
+      - run: npm run generate -w @autoserve/database
       - run: npm run validate:migrations
       - run: npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
       - run: npm run seed

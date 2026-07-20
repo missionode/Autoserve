@@ -15,7 +15,7 @@
 **Overall completion rule:** The prototype is complete only when every required phase and acceptance checkpoint in this worksheet is marked `[x]`.
 
 **Production development status:** In progress  
-**Next development stage:** Stage 4.1 — Engineering and Environment Foundation  
+**Active development stage:** Stage 4.1 — Engineering and Environment Foundation
 **Development completion rule:** Production development is complete only when Stages 4.0–4.12 and the production launch gate are `[x]`.
 
 ---
@@ -533,24 +533,33 @@ Phase 4 is a separate post-freeze program. Starting it does not alter the approv
 
 ### Stage 4.1 — Engineering and Environment Foundation
 
-**Status:** `[ ] Not started`
+**Status:** `[-] In progress — local foundation verified; cloud and deployment evidence pending`
 
-- [ ] Create the monorepo with `web`, `api`, `worker`, database, contracts, UI, configuration, observability, and testing packages.
-- [ ] Configure strict TypeScript, linting, formatting, dependency policy, commit/release conventions, and protected branches.
-- [ ] Create validated environment configuration with no secrets committed or exposed to the browser.
-- [ ] Provide containerized local PostgreSQL, Redis, object-storage/provider stubs, and deterministic seed commands.
+- [x] Create the monorepo with `web`, `api`, `worker`, database, contracts, UI, configuration, observability, and testing packages.
+- [x] Configure strict TypeScript, linting, formatting, dependency policy, and commit/release conventions; repository-host protected-branch activation remains environment-owned evidence.
+- [x] Create validated environment configuration with no secrets committed or exposed to the browser.
+- [x] Provide container definitions for local PostgreSQL, Redis, object-storage/provider stubs, and deterministic seed commands; runtime validation awaits a Docker-capable environment.
 - [ ] Provision isolated CI, development, staging, and production foundations through infrastructure as code.
 - [ ] Configure managed secrets, service identities, private database/cache networking, TLS, DNS, CDN, and storage access.
-- [ ] Create CI checks for formatting, linting, compilation, unit tests, dependency/secret/static scans, production build, and migration validation.
+- [x] Create CI checks for formatting, linting, compilation, unit tests, dependency/secret/static scans, production build, and migration validation.
 - [ ] Create deployment pipelines with immutable artifacts, approvals, health checks, smoke tests, and rollback records.
 - [ ] Establish structured logging, correlation IDs, metrics, traces, frontend error reporting, and environment dashboards.
-- [ ] Publish coding, review, database migration, feature-flag, release, and incident-development standards.
+- [x] Publish coding, review, database migration, feature-flag, release, and incident-development standards.
+
+#### In-progress engineering evidence
+
+- Verification record and remaining environment evidence: `development/stage-4.1-verification.md`.
+- Engineering and incident standards: `development/engineering-standards.md` and `development/incident-development.md`.
+- Local `npm run verify`: passed 20 July 2026.
+- CI failure-gate proof: deliberately failing test, secret, type error, and invalid migration were all rejected.
+- Dependency gate: no high or critical findings; two moderate and one low transitive advisory remain recorded.
+- Current environment lacks Docker and Terraform executables; no cloud deployment or environment claim is inferred.
 
 #### Exit criteria
 
 - [ ] A minimal web/API/worker vertical slice deploys through CI to development and staging.
 - [ ] Secrets, environment isolation, observability, health checks, and rollback path are verified.
-- [ ] CI blocks a deliberately failing test, secret, type error, and invalid migration.
+- [x] CI blocks a deliberately failing test, secret, type error, and invalid migration.
 
 ### Stage 4.2 — Database, Tenancy, Audit, and Idempotency
 

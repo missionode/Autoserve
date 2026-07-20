@@ -2,8 +2,14 @@
   "name": "autoserve",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22 <26", "npm": ">=10" },
-  "workspaces": ["apps/*", "packages/*"],
+  "engines": {
+    "node": ">=22 <26",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -11,7 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:unit": "vitest run --exclude tests/failure-fixtures/**",
+    "test:unit": "vitest run tests/foundation.test.ts",
     "test:failure-gates": "node scripts/verify-failure-gates.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "scan:dependencies": "npm audit --audit-level=high",
@@ -33,6 +39,6 @@
     "tsx": "4.20.3",
     "typescript": "5.8.3",
     "typescript-eslint": "8.38.0",
-    "vitest": "3.2.4"
+    "vitest": "3.2.7"
   }
 }

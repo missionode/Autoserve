@@ -1,1 +1,9 @@
-{"extends":"./tsconfig.json","compilerOptions":{"noEmit":false,"outDir":"dist","module":"NodeNext","moduleResolution":"NodeNext"}}
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  }
+}
