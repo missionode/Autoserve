@@ -59,6 +59,10 @@ The ratified exact Stage 4.0 internal policies and their provider/legal exceptio
 
 Stage 4.1 local verification, remaining cloud evidence, engineering rules, and incident-development rules are recorded in `development/stage-4.1-verification.md`, `development/engineering-standards.md`, and `development/incident-development.md`.
 
+The production local stack runs with `npm run local:up`. The web, API, worker, MinIO console, and provider stub are exposed on ports 3000, 3001, 3002, 9001, and 8089 respectively. Use `npm run local:smoke` for health verification and `npm run local:down` to stop containers without deleting development volumes.
+
+For a new development session, begin with `development/current-handoff.md` and follow `development/stage-resume-protocol.md`. Together they provide a reusable resume process for any Phase 4 stage, including required evidence, cold-start verification, blockers, deferred gates, and the next safe action.
+
 ## Verification
 
 ```sh

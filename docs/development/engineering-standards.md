@@ -40,4 +40,7 @@
 - `npm run test:failure-gates`: proves the failure controls reject deliberately bad fixtures.
 - `npm audit --audit-level=high`: blocks high and critical dependency findings.
 - `docker compose up -d`: PostgreSQL, Redis, MinIO, and provider stub when Docker is available.
+- `npm run local:up`: build and start the complete web/API/worker/local-infrastructure stack and wait for health.
+- `npm run local:smoke`: verify all local application and provider health endpoints.
+- `sh scripts/local-backup.sh <path>` and `sh scripts/local-restore-verify.sh <path>`: verify database recovery without replacing the development database.
 - `npm run seed`: deterministic foundation seed after PostgreSQL and the migration are available.

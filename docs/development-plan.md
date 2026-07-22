@@ -4,7 +4,7 @@
 
 - Product: Autoserve
 - Input baseline: stakeholder-approved browser prototype freeze
-- Development status: In progress — Stage 4.1 Engineering and Environment Foundation
+- Development status: Stage 4.1A local Docker foundation complete; Stage 4.2 local development active; Stage 4.1B cloud deployment deferred as a mandatory pre-pilot gate
 - Delivery model: TypeScript modular monolith
 - Primary stack: Next.js, NestJS, PostgreSQL, Prisma, Redis/BullMQ, Socket.IO, Cashfree, and S3-compatible storage
 - Companion documents: `requirement.md`, `technology-recommendation.md`, `subscription-billing.md`, and `worksheet.md`

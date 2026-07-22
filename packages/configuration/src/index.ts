@@ -4,6 +4,7 @@ const serverSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
   API_PORT: z.coerce.number().int().positive().default(3001),
+  WORKER_PORT: z.coerce.number().int().positive().default(3002),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   OBJECT_STORAGE_ENDPOINT: z.string().url(),

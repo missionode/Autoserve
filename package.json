@@ -23,11 +23,16 @@
     "scan:dependencies": "npm audit --audit-level=high",
     "scan:static": "eslint apps packages scripts --max-warnings=0",
     "validate:migrations": "node scripts/validate-migrations.mjs",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run scan:secrets && npm run validate:migrations && npm run build",
+    "docs:handoff:check": "node scripts/verify-handoff.mjs",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run scan:secrets && npm run validate:migrations && npm run docs:handoff:check && npm run build",
     "dev:web": "npm run dev -w @autoserve/web",
     "dev:api": "npm run dev -w @autoserve/api",
     "dev:worker": "npm run dev -w @autoserve/worker",
     "seed": "npm run seed -w @autoserve/database",
+    "local:up": "docker compose up --build -d --wait",
+    "local:down": "docker compose down",
+    "local:smoke": "node scripts/local-smoke.mjs",
+    "local:logs": "docker compose logs --tail=200 web api worker",
     "release:check": "npm run verify && npm run test:failure-gates"
   },
   "devDependencies": {

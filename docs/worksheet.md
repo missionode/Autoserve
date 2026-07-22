@@ -11,11 +11,14 @@
 
 **Prototype status:** Complete — stakeholder-approved freeze  
 **Completed major phases:** 3 of 3  
-**Current major phase:** Prototype complete; production development is the next separate phase  
+**Current major phase:** Prototype complete; Phase 4 production development is in progress
 **Overall completion rule:** The prototype is complete only when every required phase and acceptance checkpoint in this worksheet is marked `[x]`.
 
 **Production development status:** In progress  
-**Active development stage:** Stage 4.1 — Engineering and Environment Foundation
+**Active local development stage:** Stage 4.2 — Database, Tenancy, Audit, and Idempotency
+
+**Deferred deployment gate:** Stage 4.1B — Cloud Deployment Foundation
+
 **Development completion rule:** Production development is complete only when Stages 4.0–4.12 and the production launch gate are `[x]`.
 
 ---
@@ -478,7 +481,7 @@ Verification notes:
 
 ## Phase 4 — Production Development
 
-**Status:** `[-] In progress — Stage 4.0 complete; Stage 4.1 is next`
+**Status:** `[-] In progress — Stage 4.0 and Stage 4.1A complete; Stage 4.2 local development is active; Stage 4.1B cloud deployment is deferred`
 
 **Planning source:** `development-plan.md`  
 **Architecture source:** `technology-recommendation.md`  
@@ -533,12 +536,26 @@ Phase 4 is a separate post-freeze program. Starting it does not alter the approv
 
 ### Stage 4.1 — Engineering and Environment Foundation
 
-**Status:** `[-] In progress — local foundation verified; cloud and deployment evidence pending`
+**Status:** `[-] In progress — Stage 4.1A local Docker foundation complete; Stage 4.1B cloud deployment deferred as a mandatory pre-pilot gate`
+
+#### Stage 4.1A — Local Docker foundation
+
+- [x] Build web, API, worker, migration, and seed application containers from the pinned monorepo lockfile.
+- [x] Run PostgreSQL, Redis, MinIO object storage, and the payment-provider stub through Docker Compose.
+- [x] Apply the Prisma migration and deterministic seed before application startup.
+- [x] Verify web, API, worker, object-storage, and provider-stub health endpoints.
+- [x] Verify PostgreSQL data persists across a container restart.
+- [x] Create a local SQL backup and restore it into an isolated disposable verification database.
+- [x] Add the same Compose build, smoke, backup, and restore flow to CI.
+
+The Product Owner's local-first plan permits Stage 4.2 local development after Stage 4.1A. Stage 4.1B cloud deployment remains required before pilot deployment and does not become implicitly approved or complete.
+
+#### Shared engineering controls and Stage 4.1B cloud deployment foundation
 
 - [x] Create the monorepo with `web`, `api`, `worker`, database, contracts, UI, configuration, observability, and testing packages.
 - [x] Configure strict TypeScript, linting, formatting, dependency policy, and commit/release conventions; repository-host protected-branch activation remains environment-owned evidence.
 - [x] Create validated environment configuration with no secrets committed or exposed to the browser.
-- [x] Provide container definitions for local PostgreSQL, Redis, object-storage/provider stubs, and deterministic seed commands; runtime validation awaits a Docker-capable environment.
+- [x] Provide and runtime-validate containerized local PostgreSQL, Redis, object-storage/provider stubs, and deterministic seed commands.
 - [ ] Provision isolated CI, development, staging, and production foundations through infrastructure as code.
 - [ ] Configure managed secrets, service identities, private database/cache networking, TLS, DNS, CDN, and storage access.
 - [x] Create CI checks for formatting, linting, compilation, unit tests, dependency/secret/static scans, production build, and migration validation.
@@ -553,7 +570,7 @@ Phase 4 is a separate post-freeze program. Starting it does not alter the approv
 - Local `npm run verify`: passed 20 July 2026.
 - CI failure-gate proof: deliberately failing test, secret, type error, and invalid migration were all rejected.
 - Dependency gate: no high or critical findings; two moderate and one low transitive advisory remain recorded.
-- Current environment lacks Docker and Terraform executables; no cloud deployment or environment claim is inferred.
+- Docker Compose runtime, persistence, backup, and restore evidence passed 21 July 2026. Terraform/cloud deployment evidence remains outstanding.
 
 #### Exit criteria
 
@@ -563,7 +580,7 @@ Phase 4 is a separate post-freeze program. Starting it does not alter the approv
 
 ### Stage 4.2 — Database, Tenancy, Audit, and Idempotency
 
-**Status:** `[ ] Not started`
+**Status:** `[-] Ready to start locally — no Stage 4.2 implementation item completed yet`
 
 - [ ] Implement the approved PostgreSQL/Prisma identity, restaurant, membership, licence, table, and counter schema.
 - [ ] Implement catalog, cart, checkout, payment, order, KOT, event, cancellation, refund, reward, Support, subscription, notification, audit, webhook, and export foundations.
@@ -806,9 +823,9 @@ Phase 4 is a separate post-freeze program. Starting it does not alter the approv
 
 | Development stage | Status | Evidence |
 |---|---|---|
-| 4.0 Decisions and Governance | Not started | Pending |
-| 4.1 Engineering and Environment Foundation | Not started | Pending |
-| 4.2 Database, Tenancy, Audit, and Idempotency | Not started | Pending |
+| 4.0 Decisions and Governance | Complete | `production-decisions.md`, `development/stage-4.0-policy-resolution.md` |
+| 4.1 Engineering and Environment Foundation | In progress | Stage 4.1A complete: `development/stage-4.1-verification.md`; Stage 4.1B deferred |
+| 4.2 Database, Tenancy, Audit, and Idempotency | Ready to start locally | `development/current-handoff.md` |
 | 4.3 Identity and Authorization | Not started | Pending |
 | 4.4 Restaurant Onboarding, Configuration, Catalog, and QR | Not started | Pending |
 | 4.5 Customer Entry, Menu, Cart, and Checkout Draft | Not started | Pending |
@@ -820,7 +837,7 @@ Phase 4 is a separate post-freeze program. Starting it does not alter the approv
 | 4.11 Security, Compliance, and Operational Readiness | Not started | Pending |
 | 4.12 Pilot, Launch, and Handover | Not started | Pending |
 
-**Production development completion:** In progress — Stage 4.0 is complete; Stage 4.1 is next and no implementation stage has started.
+**Production development completion:** In progress — Stage 4.0 and local Stage 4.1A are complete; Stage 4.2 is the active local implementation stage; Stage 4.1B cloud deployment remains a mandatory pre-pilot gate.
 
 ## Status Update Procedure
 
@@ -833,3 +850,6 @@ When work progresses:
 5. Preserve the stakeholder-approved prototype status while production development progresses.
 6. Mark Phase 4 Complete only after every Stage 4.0–4.12 exit criterion and the Production Launch Gate are `[x]`.
 7. Add direct evidence links, test results, owner, decision references, and release identifiers whenever a production item is completed.
+8. Update `development/current-handoff.md` after every meaningful checkpoint, blocker, stage transition, or deferred-gate change by following `development/stage-resume-protocol.md`.
+9. Ensure the handoff names the first unchecked worksheet item, the last verified command/result, the next safe action, and anything that must not be inferred as complete.
+10. Before ending a work session, run the resume-integrity checks defined in the stage-resume protocol and remove stale stage language from the documentation.
