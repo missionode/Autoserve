@@ -45,6 +45,8 @@ jobs:
       - run: npm run validate:migrations
       - run: npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
       - run: npm run seed
+      - run: npm run test:database:foundation
+      - run: npm run test:database:catalog-cart
   build:
     runs-on: ubuntu-latest
     env:

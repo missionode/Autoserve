@@ -10,6 +10,9 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "postcss": "8.5.22"
+  },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -18,6 +21,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:unit": "vitest run tests/foundation.test.ts",
+    "test:database:foundation": "vitest run tests/database-foundation.test.ts",
+    "test:database:catalog-cart": "vitest run tests/database-catalog-cart.test.ts",
     "test:failure-gates": "node scripts/verify-failure-gates.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "scan:dependencies": "npm audit --audit-level=high",

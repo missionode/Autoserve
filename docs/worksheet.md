@@ -580,10 +580,10 @@ The Product Owner's local-first plan permits Stage 4.2 local development after S
 
 ### Stage 4.2 — Database, Tenancy, Audit, and Idempotency
 
-**Status:** `[-] Ready to start locally — no Stage 4.2 implementation item completed yet`
+**Status:** `[-] In progress — identity and restaurant-tenancy foundation verified`
 
-- [ ] Implement the approved PostgreSQL/Prisma identity, restaurant, membership, licence, table, and counter schema.
-- [ ] Implement catalog, cart, checkout, payment, order, KOT, event, cancellation, refund, reward, Support, subscription, notification, audit, webhook, and export foundations.
+- [x] Implement the approved PostgreSQL/Prisma identity, restaurant, membership, licence, table, and counter schema — migration, deterministic seed, zero-drift check, and four database integration tests passed 24 July 2026.
+- [-] Implement catalog, cart, checkout, payment, order, KOT, event, cancellation, refund, reward, Support, subscription, notification, audit, webhook, and export foundations — catalog, availability, cart, and immutable price-snapshot sub-slice fully verified; checkout/payment/order/KOT is next.
 - [ ] Add UUID/ULID identifiers, UTC timestamps, foreign keys, checks, indexes, optimistic versions, and money/status constraints.
 - [ ] Add restaurant identifiers to every tenant-owned record and document the tenant-policy map.
 - [ ] Implement PostgreSQL Row-Level Security with default-deny behavior and explicit platform/Support policies.
@@ -592,6 +592,19 @@ The Product Owner's local-first plan permits Stage 4.2 local development after S
 - [ ] Add forward migration, seed, reset-for-development, backup, restore, and migration-test tooling.
 - [ ] Create a database data dictionary and critical entity/sequence diagrams.
 - [ ] Add automated cross-tenant, uniqueness, locking, rollback, and migration tests.
+
+#### In-progress Stage 4.2 evidence
+
+- Identity and restaurant-tenancy verification: `development/stage-4.2-verification.md`.
+- Applied migration: `packages/database/prisma/migrations/202607240001_identity_restaurant_tenancy/migration.sql`.
+- Deterministic seed: `packages/database/src/seed.ts`.
+- Database integration coverage: `tests/database-foundation.test.ts` — four tests passed 24 July 2026.
+- Prisma schema-to-database comparison: no difference detected.
+- SQL backup and disposable restore verification: passed 24 July 2026.
+- Next unchecked item: tenant-owned catalog, ordering, payment, fulfillment, Support, subscription, notification, audit, webhook, and export foundations.
+- Completed sub-slice: catalog/category/menu availability and cart migration, deterministic seed, composite tenant relations, four constraint tests, zero drift, backup, restore, full build, and local smoke passed 24 July 2026.
+- Next sub-slice: checkout attempts, payment attempts, orders, immutable order lines, KOT/token allocation, and order status events.
+- Open deployment/Security gate: high transitive PostCSS and Sharp advisories remain inside the current Next.js package tree; direct framework advisories are patched at Next.js 15.5.21. This does not satisfy the Stage 4.11 dependency gate.
 
 #### Exit criteria
 
@@ -825,7 +838,7 @@ The Product Owner's local-first plan permits Stage 4.2 local development after S
 |---|---|---|
 | 4.0 Decisions and Governance | Complete | `production-decisions.md`, `development/stage-4.0-policy-resolution.md` |
 | 4.1 Engineering and Environment Foundation | In progress | Stage 4.1A complete: `development/stage-4.1-verification.md`; Stage 4.1B deferred |
-| 4.2 Database, Tenancy, Audit, and Idempotency | Ready to start locally | `development/current-handoff.md` |
+| 4.2 Database, Tenancy, Audit, and Idempotency | In progress | First schema slice verified: `development/stage-4.2-verification.md` |
 | 4.3 Identity and Authorization | Not started | Pending |
 | 4.4 Restaurant Onboarding, Configuration, Catalog, and QR | Not started | Pending |
 | 4.5 Customer Entry, Menu, Cart, and Checkout Draft | Not started | Pending |

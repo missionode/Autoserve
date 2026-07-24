@@ -4,12 +4,12 @@ This is the canonical live resume snapshot. Update it through `stage-resume-prot
 
 ## Active Stage Snapshot
 
-- Updated: 21 July 2026
+- Updated: 24 July 2026
 - Active stage: Stage 4.2 — Database, Tenancy, Audit, and Idempotency
-- Status: Ready to start locally
-- First unchecked item: Implement the approved PostgreSQL/Prisma identity, restaurant, membership, licence, table, and counter schema
-- Last completed checkpoint: Stage 4.1A local Docker foundation and recovery verification
-- Next safe action: Design and implement the first Stage 4.2 Prisma schema/migration slice for identity and restaurant tenancy, then test it in the local PostgreSQL container
+- Status: In progress
+- First unchecked item: Continue the tenant-owned domain foundations item with checkout, payment, order, KOT, and event records
+- Last completed checkpoint: Catalog/cart migration, deterministic seed, four constraint/tenant tests, zero drift, backup/restore, full build, and local smoke passed
+- Next safe action: Design checkout attempts, payment attempts, orders, immutable order lines, KOT/token allocation, and order status events with provider/idempotency and money/state invariants
 - Blockers: None for local Stage 4.2 work
 - Safe parallel work: None authorized; follow the worksheet sequentially
 
@@ -20,7 +20,7 @@ This is the canonical live resume snapshot. Update it through `stage-resume-prot
 | 4.0 Decisions and Governance | Complete | `../production-decisions.md`, `stage-4.0-policy-resolution.md` |
 | 4.1A Local Docker Foundation | Complete | `stage-4.1-verification.md` |
 | 4.1B Cloud Deployment Foundation | Deferred mandatory gate | GitHub/AWS development and staging evidence required before pilot |
-| 4.2 Database, Tenancy, Audit, and Idempotency | Ready | Active stage; no implementation item complete |
+| 4.2 Database, Tenancy, Audit, and Idempotency | In progress | First worksheet item complete; `stage-4.2-verification.md` |
 | 4.3–4.5 | Not started | Must follow Stage 4.2 exit criteria |
 | 4.6 Payments | Not started; externally gated | Provider onboarding/behavior and legal/tax gates remain |
 | 4.7–4.8 | Not started | Follow worksheet sequence |
@@ -29,15 +29,18 @@ This is the canonical live resume snapshot. Update it through `stage-resume-prot
 
 ## Last Verified State
 
-- Verification date: 21 July 2026
+- Verification date: 24 July 2026
 - `npm run verify`: passed
 - `npm run test:failure-gates`: passed; failing test, type error, secret, and invalid migration were rejected
 - `npm run local:smoke`: passed for web, API, worker, provider stub, and object storage
 - Prisma migration and deterministic `stage-4.1` seed: passed
 - PostgreSQL persistence after restart: passed
 - SQL backup and disposable restore verification: passed
-- Dependency gate: no high or critical findings; two moderate and one low transitive advisory recorded
-- Detailed evidence: `stage-4.1-verification.md`
+- Stage 4.2 migration status: two migrations applied and current
+- Stage 4.2 Prisma/database drift: no difference detected
+- Stage 4.2 database integration tests: four passed
+- Dependency gate: direct Next.js advisories patched at 15.5.21; high transitive PostCSS/Sharp advisories remain an explicit upstream Security/Stage 4.11 deployment gate
+- Detailed evidence: `stage-4.1-verification.md` and `stage-4.2-verification.md`
 
 ## Cold-Start Actions
 
@@ -68,6 +71,8 @@ This is the canonical live resume snapshot. Update it through `stage-resume-prot
 
 ## Partial Work and Cleanup
 
-- No known partial Stage 4.2 implementation exists.
+- No partial catalog/cart work remains; migration `202607240002_catalog_cart_foundation` is applied and verified.
+- No checkout/payment/order/KOT schema has been started; begin from its invariant design.
+- The high transitive Next.js dependency advisories are unresolved and must remain visible as a deployment/Security gate.
 - Local Docker containers may already be running; stopping them with `npm run local:down` preserves volumes.
 - The local backup used for verification is in `/tmp` and is not production evidence.
